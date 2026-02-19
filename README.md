@@ -46,6 +46,15 @@ Project planning and tracking completed in Azure DevOps:
 - **Sprints**: 2-week iterations with sprint goals, committed sprint backlog, daily stand-ups (simulated).
 - **Boards**: Customized columns showing Work Item Type, Title, Story Points, State, Assigned To, Original Estimate.
 
+##Development Team
+
+Tharindya Anjalika — Backend Developer
+   Responsible for API endpoints, authentication, business logic, clause versioning, approval workflows, and document generation.
+Sahal Tai — Frontend Developer
+   Responsible for React/Next.js UI, clause editor component, real-time collaboration UI, approval/rejection interfaces, messaging view, and responsive design.
+Dasun Abeysooriya — Database Specialist
+   Responsible for MongoDB schema design, data modeling (clauses, versions, comments, users), indexing, queries, seeding test data, and ensuring secure & efficient data handling
+
 ## How to Run Locally
 
 ### Prerequisites
