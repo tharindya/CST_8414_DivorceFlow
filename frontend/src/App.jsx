@@ -5,6 +5,8 @@ import Collaboration from '@tiptap/extension-collaboration'
 import * as Y from 'yjs'
 import { WebsocketProvider } from 'y-websocket'
 
+
+
 // Local server – change port if you used 4444
 const ydoc = new Y.Doc()
 const provider = new WebsocketProvider('ws://localhost:5000', 'divorceflow-room', ydoc)
