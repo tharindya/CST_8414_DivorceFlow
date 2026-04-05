@@ -7,6 +7,8 @@ import Register from "../pages/Register";
 import Dashboard from "../pages/Dashboard";
 import CasePage from "../pages/CasePage";
 
+import InvitePage from "../pages/InvitePage";
+
 export default function AppRoutes() {
   return (
     <Routes>
@@ -34,6 +36,8 @@ export default function AppRoutes() {
       />
 
       <Route path="*" element={<div style={{ padding: 16 }}>Not found</div>} />
+
+      <Route path="/invite" element={<ProtectedRoute><InvitePage /></ProtectedRoute>} />
     </Routes>
   );
 }

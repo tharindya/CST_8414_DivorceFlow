@@ -11,12 +11,32 @@ const participantSchema = new mongoose.Schema(
 const caseSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true, minlength: 3 },
-    status: { type: String, enum: ["DRAFT", "NEGOTIATING", "READY", "EXPORTED"], default: "DRAFT" },
+    status: {
+      type: String,
+      enum: ["DRAFT", "NEGOTIATING", "READY", "EXPORTED"],
+      default: "DRAFT",
+    },
     participants: { type: [participantSchema], default: [] },
 
-    // simple invite code 
     inviteCode: { type: String, required: true },
     inviteUsed: { type: Boolean, default: false },
+
+    partyBEmail: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: null,
+    },
+    inviteToken: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    invitationStatus: {
+      type: String,
+      enum: ["PENDING", "SENT", "ACCEPTED", "EXPIRED"],
+      default: "PENDING",
+    },
   },
   { timestamps: true }
 );
