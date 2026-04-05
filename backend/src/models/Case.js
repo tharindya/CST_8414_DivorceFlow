@@ -1,0 +1,26 @@
+const mongoose = require("mongoose");
+
+const participantSchema = new mongoose.Schema(
+  {
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    role: { type: String, enum: ["PARTY_A", "PARTY_B"], required: true },
+  },
+  { _id: false }
+);
+
+const caseSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true, trim: true, minlength: 3 },
+    status: { type: String, enum: ["DRAFT", "NEGOTIATING", "READY", "EXPORTED"], default: "DRAFT" },
+    participants: { type: [participantSchema], default: [] },
+
+    // simple invite code 
+    inviteCode: { type: String, required: true },
+    inviteUsed: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
+
+caseSchema.index({ "participants.userId": 1 });
+
+module.exports = mongoose.model("Case", caseSchema);
