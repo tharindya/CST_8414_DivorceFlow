@@ -1,4 +1,6 @@
 const Clause = require("../models/Clause");
+const ClauseAction = require("../models/ClauseAction");
+const { recomputeCaseStatus } = require("./approval.controller");
 
 async function listClauses(req, res, next) {
   try {
@@ -74,14 +76,36 @@ async function updateClause(req, res, next) {
     const clause = await Clause.findById(clauseId);
     if (!clause) return res.status(404).json({ error: "Clause not found" });
 
-    if (typeof title === "string") clause.title = title.trim();
-    if (typeof category === "string") clause.category = category.trim();
-    if (typeof contentCurrent === "string") clause.contentCurrent = contentCurrent;
+    const nextTitle =
+      typeof title === "string" ? title.trim() : clause.title;
 
+    const nextCategory =
+      typeof category === "string" ? category.trim() : clause.category;
+
+    const nextContent =
+      typeof contentCurrent === "string" ? contentCurrent : clause.contentCurrent;
+
+    const materialChanged =
+      nextTitle !== clause.title ||
+      nextCategory !== clause.category ||
+      nextContent !== clause.contentCurrent;
+
+    clause.title = nextTitle;
+    clause.category = nextCategory;
+    clause.contentCurrent = nextContent;
     clause.updatedBy = req.user.id;
+
     await clause.save();
 
-    res.json({ clause });
+    let approvalsReset = false;
+
+    if (materialChanged) {
+      await ClauseAction.deleteMany({ clauseId: clause._id });
+      await recomputeCaseStatus(clause.caseId);
+      approvalsReset = true;
+    }
+
+    res.json({ clause, approvalsReset });
   } catch (err) {
     next(err);
   }

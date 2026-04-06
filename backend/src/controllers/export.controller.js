@@ -2,6 +2,27 @@ const Case = require("../models/Case");
 const Clause = require("../models/Clause");
 const User = require("../models/User");
 const { buildAgreementPdf } = require("../services/export.service");
+const { buildExportCheck } = require("../services/exportCheck.service");
+
+async function getExportCheck(req, res, next) {
+  try {
+    const { caseId } = req.params;
+
+    const caseDoc = await Case.findById(caseId).lean();
+    if (!caseDoc) {
+      return res.status(404).json({ error: "Case not found" });
+    }
+
+    const clauses = await Clause.find({ caseId })
+      .sort({ orderIndex: 1, createdAt: 1 })
+      .lean();
+
+    const check = buildExportCheck(caseDoc, clauses);
+    res.json(check);
+  } catch (err) {
+    next(err);
+  }
+}
 
 async function exportCasePdf(req, res, next) {
   try {
@@ -19,6 +40,8 @@ async function exportCasePdf(req, res, next) {
     const clauses = await Clause.find({ caseId })
       .sort({ orderIndex: 1, createdAt: 1 })
       .lean();
+
+    const exportCheck = buildExportCheck(caseDoc, clauses);
 
     const participantIds = caseDoc.participants.map((p) => p.userId);
     const users = await User.find({ _id: { $in: participantIds } })
@@ -45,6 +68,7 @@ async function exportCasePdf(req, res, next) {
       clauses,
       partyA,
       partyB,
+      exportCheck,
     });
 
     doc.pipe(res);
@@ -55,5 +79,6 @@ async function exportCasePdf(req, res, next) {
 }
 
 module.exports = {
+  getExportCheck,
   exportCasePdf,
 };

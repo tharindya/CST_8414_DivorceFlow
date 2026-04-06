@@ -10,11 +10,7 @@ function writeLabelValue(doc, label, value) {
 
 function addDivider(doc) {
   const y = doc.y;
-  doc
-    .moveTo(50, y)
-    .lineTo(545, y)
-    .strokeColor("#cccccc")
-    .stroke();
+  doc.moveTo(50, y).lineTo(545, y).strokeColor("#cccccc").stroke();
   doc.moveDown();
   doc.strokeColor("#000000");
 }
@@ -49,17 +45,14 @@ function buildAgreementPdf({ caseDoc, clauses, partyA, partyB }) {
   doc.moveDown(1.5);
 
   writeLabelValue(doc, "Case Status", caseDoc.status);
+  writeLabelValue(doc, "Jurisdiction", caseDoc.jurisdiction || "General");
   writeLabelValue(doc, "Party A", partyA?.name || partyA?.email || "Party A");
   writeLabelValue(doc, "Party B", partyB?.name || partyB?.email || "Party B");
 
   doc.moveDown();
   addDivider(doc);
 
-  doc
-    .font("Helvetica-Bold")
-    .fontSize(14)
-    .text("Final Agreed Clauses");
-
+  doc.font("Helvetica-Bold").fontSize(14).text("Final Agreed Clauses");
   doc.moveDown(0.75);
 
   if (!clauses.length) {
@@ -101,7 +94,6 @@ function buildAgreementPdf({ caseDoc, clauses, partyA, partyB }) {
   doc.font("Helvetica-Bold").fontSize(14).text("Signatures");
 
   doc.moveDown(1.5);
-
   doc.font("Helvetica").fontSize(11);
   doc.text("Party A Signature: ______________________________");
   doc.moveDown(1.5);

@@ -36,7 +36,9 @@ async function request(path, options = {}) {
 export const api = {
   // invite
   getInvite: (caseId, token) =>
-    request(`/cases/invite?caseId=${encodeURIComponent(caseId)}&token=${encodeURIComponent(token)}`),
+    request(
+      `/cases/invite?caseId=${encodeURIComponent(caseId)}&token=${encodeURIComponent(token)}`
+    ),
 
   sendInvite: (caseId) =>
     request(`/cases/${caseId}/send-invite`, { method: "POST" }),
@@ -75,7 +77,9 @@ export const api = {
 
   // templates
   listTemplates: (jurisdiction) =>
-  request(`/templates?jurisdiction=${encodeURIComponent(jurisdiction || "General")}`),
+    request(
+      `/templates?jurisdiction=${encodeURIComponent(jurisdiction || "General")}`
+    ),
 
   buildTemplateDraft: (templateId, values) =>
     request(`/templates/${templateId}/build`, {
@@ -120,7 +124,8 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
-
+  // export
+  getExportCheck: (caseId) => request(`/cases/${caseId}/export/check`),
 
   downloadCasePdf: async (caseId) => {
     const token = getToken();

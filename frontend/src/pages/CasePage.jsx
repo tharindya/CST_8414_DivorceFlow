@@ -11,6 +11,7 @@ export default function CasePage() {
   const [templates, setTemplates] = useState([]);
   const [templateDetails, setTemplateDetails] = useState(null);
   const [templateValues, setTemplateValues] = useState({});
+  const [exportCheck, setExportCheck] = useState(null);
 
   const [selectedClauseId, setSelectedClauseId] = useState(null);
   const selectedClause = useMemo(
@@ -33,6 +34,20 @@ export default function CasePage() {
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
 
+  async function loadExportCheck(currentCaseDoc) {
+    if (!currentCaseDoc || currentCaseDoc.status !== "READY") {
+      setExportCheck(null);
+      return;
+    }
+
+    try {
+      const data = await api.getExportCheck(caseId);
+      setExportCheck(data);
+    } catch (err) {
+      setError(err.message || "Failed to load export check");
+    }
+  }
+
   async function loadAll() {
     setError("");
     setLoading(true);
@@ -50,6 +65,7 @@ export default function CasePage() {
       setClauses(loadedClauses);
       setStatusRows(statusRes.clauses || []);
       setTemplates(loadedTemplates);
+      await loadExportCheck(caseRes.case);
 
       const first = loadedClauses[0];
       if (!selectedClauseId && first?._id) {
@@ -176,8 +192,11 @@ export default function CasePage() {
       setClauses(nextClauses);
 
       const statusRes = await api.getClauseStatus(caseId);
+      const nextCase = { ...(caseDoc || {}), status: statusRes.caseStatus };
+
       setStatusRows(statusRes.clauses || []);
-      setCaseDoc((prev) => (prev ? { ...prev, status: statusRes.caseStatus } : prev));
+      setCaseDoc(nextCase);
+      await loadExportCheck(nextCase);
 
       setSelectedTemplateId("");
       setTemplateDetails(null);
@@ -206,6 +225,13 @@ export default function CasePage() {
 
       const updated = data.clause;
       setClauses((prev) => prev.map((c) => (c._id === updated._id ? updated : c)));
+
+      const statusRes = await api.getClauseStatus(caseId);
+      const nextCase = { ...(caseDoc || {}), status: statusRes.caseStatus };
+
+      setStatusRows(statusRes.clauses || []);
+      setCaseDoc(nextCase);
+      await loadExportCheck(nextCase);
     } catch (err) {
       setError(err.message || "Failed to save clause");
     } finally {
@@ -241,8 +267,11 @@ export default function CasePage() {
       await api.approve(selectedClause._id);
 
       const statusRes = await api.getClauseStatus(caseId);
+      const nextCase = { ...(caseDoc || {}), status: statusRes.caseStatus };
+
       setStatusRows(statusRes.clauses || []);
-      setCaseDoc((prev) => (prev ? { ...prev, status: statusRes.caseStatus } : prev));
+      setCaseDoc(nextCase);
+      await loadExportCheck(nextCase);
     } catch (err) {
       setError(err.message || "Failed to approve");
     } finally {
@@ -281,8 +310,11 @@ export default function CasePage() {
       await loadCommentsForClause(selectedClause._id);
 
       const statusRes = await api.getClauseStatus(caseId);
+      const nextCase = { ...(caseDoc || {}), status: statusRes.caseStatus };
+
       setStatusRows(statusRes.clauses || []);
-      setCaseDoc((prev) => (prev ? { ...prev, status: statusRes.caseStatus } : prev));
+      setCaseDoc(nextCase);
+      await loadExportCheck(nextCase);
 
       setRejectModalOpen(false);
       setRejectReason("");
@@ -357,6 +389,42 @@ export default function CasePage() {
           )}
         </div>
       </div>
+
+      {caseDoc?.status === "READY" && exportCheck && (
+        <div
+          style={{
+            marginTop: 12,
+            border: "1px solid #f0d58a",
+            background: "#fff6df",
+            padding: 12,
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>
+            Drafting Completeness Review
+          </div>
+
+          <div style={{ fontSize: 12, color: "#7a4d00", marginBottom: 8 }}>
+            {exportCheck.disclaimer}
+          </div>
+
+          {exportCheck.warnings?.length === 0 ? (
+            <div style={{ color: "#1f6f2a", fontWeight: 600 }}>
+              No major missing sections were detected.
+            </div>
+          ) : (
+            <>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Warnings:</div>
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {exportCheck.warnings.map((warning) => (
+                  <li key={warning} style={{ marginBottom: 4 }}>
+                    {warning}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
 
       {error && (
         <div
