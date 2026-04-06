@@ -7,7 +7,7 @@ export default function CasePage() {
 
   const [caseDoc, setCaseDoc] = useState(null);
   const [clauses, setClauses] = useState([]);
-  const [statusRows, setStatusRows] = useState([]); // from /clauses/status
+  const [statusRows, setStatusRows] = useState([]);
 
   const [selectedClauseId, setSelectedClauseId] = useState(null);
   const selectedClause = useMemo(
@@ -20,19 +20,19 @@ export default function CasePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  // create clause form
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState("General");
 
-  // editor state
   const [draftContent, setDraftContent] = useState("");
-
-  // comment form
   const [commentText, setCommentText] = useState("");
+
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
 
   async function loadAll() {
     setError("");
     setLoading(true);
+
     try {
       const [caseRes, clauseRes, statusRes] = await Promise.all([
         api.getCase(caseId),
@@ -40,13 +40,16 @@ export default function CasePage() {
         api.getClauseStatus(caseId),
       ]);
 
+      const loadedClauses = clauseRes.clauses || [];
+
       setCaseDoc(caseRes.case);
-      setClauses(clauseRes.clauses || []);
+      setClauses(loadedClauses);
       setStatusRows(statusRes.clauses || []);
 
-      // auto-select first clause if none selected
-      const first = (clauseRes.clauses || [])[0];
-      if (!selectedClauseId && first?._id) setSelectedClauseId(first._id);
+      const first = loadedClauses[0];
+      if (!selectedClauseId && first?._id) {
+        setSelectedClauseId(first._id);
+      }
     } catch (err) {
       setError(err.message || "Failed to load case");
     } finally {
@@ -59,6 +62,7 @@ export default function CasePage() {
       setComments([]);
       return;
     }
+
     try {
       const data = await api.listComments(clauseId);
       setComments(data.comments || []);
@@ -67,20 +71,21 @@ export default function CasePage() {
     }
   }
 
-  // initial load
   useEffect(() => {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caseId]);
 
-  // when selected clause changes, load its comments and set editor draft
   useEffect(() => {
     if (selectedClause) {
       setDraftContent(selectedClause.contentCurrent || "");
       loadCommentsForClause(selectedClause._id);
+    } else {
+      setDraftContent("");
+      setComments([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedClauseId]);
+  }, [selectedClauseId, selectedClause]);
 
   function statusForClause(clauseId) {
     return statusRows.find((s) => s.clauseId === clauseId) || null;
@@ -90,6 +95,7 @@ export default function CasePage() {
     e.preventDefault();
     setError("");
     setBusy(true);
+
     try {
       const data = await api.createClause(caseId, {
         title: newTitle,
@@ -97,10 +103,12 @@ export default function CasePage() {
       });
 
       const created = data.clause;
-      const nextClauses = [...clauses, created].sort((a, b) => a.orderIndex - b.orderIndex);
+      const nextClauses = [...clauses, created].sort(
+        (a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0)
+      );
+
       setClauses(nextClauses);
 
-      // refresh status summary
       const statusRes = await api.getClauseStatus(caseId);
       setStatusRows(statusRes.clauses || []);
       setCaseDoc((prev) => (prev ? { ...prev, status: statusRes.caseStatus } : prev));
@@ -117,8 +125,10 @@ export default function CasePage() {
 
   async function onSaveClause() {
     if (!selectedClause) return;
+
     setError("");
     setBusy(true);
+
     try {
       const data = await api.updateClause(selectedClause._id, {
         contentCurrent: draftContent,
@@ -136,8 +146,10 @@ export default function CasePage() {
   async function onAddComment(e) {
     e.preventDefault();
     if (!selectedClause) return;
+
     setError("");
     setBusy(true);
+
     try {
       await api.addComment(selectedClause._id, { message: commentText });
       setCommentText("");
@@ -151,12 +163,13 @@ export default function CasePage() {
 
   async function onApprove() {
     if (!selectedClause) return;
+
     setError("");
     setBusy(true);
+
     try {
       await api.approve(selectedClause._id);
 
-      // refresh status + case status
       const statusRes = await api.getClauseStatus(caseId);
       setStatusRows(statusRes.clauses || []);
       setCaseDoc((prev) => (prev ? { ...prev, status: statusRes.caseStatus } : prev));
@@ -167,22 +180,42 @@ export default function CasePage() {
     }
   }
 
-  async function onReject() {
+  function openRejectModal() {
     if (!selectedClause) return;
-    const reason = window.prompt("Reason for rejection (required):");
-    if (!reason || !reason.trim()) return;
+    setRejectReason("");
+    setError("");
+    setRejectModalOpen(true);
+  }
+
+  function closeRejectModal() {
+    if (busy) return;
+    setRejectModalOpen(false);
+    setRejectReason("");
+  }
+
+  async function onRejectConfirm() {
+    if (!selectedClause) return;
+
+    const reason = rejectReason.trim();
+    if (!reason) {
+      setError("Reason for rejection is required.");
+      return;
+    }
 
     setError("");
     setBusy(true);
+
     try {
       await api.reject(selectedClause._id, { comment: reason });
 
-      // refresh comments and status
       await loadCommentsForClause(selectedClause._id);
 
       const statusRes = await api.getClauseStatus(caseId);
       setStatusRows(statusRes.clauses || []);
       setCaseDoc((prev) => (prev ? { ...prev, status: statusRes.caseStatus } : prev));
+
+      setRejectModalOpen(false);
+      setRejectReason("");
     } catch (err) {
       setError(err.message || "Failed to reject");
     } finally {
@@ -190,11 +223,31 @@ export default function CasePage() {
     }
   }
 
-  if (loading) return <div style={{ padding: 16 }}>Loading...</div>;
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === "Escape" && rejectModalOpen && !busy) {
+        closeRejectModal();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [rejectModalOpen, busy]);
+
+  if (loading) {
+    return <div style={{ padding: 16 }}>Loading...</div>;
+  }
 
   return (
     <div style={{ maxWidth: 1200, margin: "24px auto", padding: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
         <div>
           <div style={{ fontSize: 14, color: "#666" }}>
             <Link to="/dashboard">← Back</Link>
@@ -205,27 +258,34 @@ export default function CasePage() {
           </div>
           {caseDoc?.inviteCode && (
             <div style={{ fontSize: 13, color: "#555" }}>
-              Invite Code: <code>{caseDoc.inviteCode}</code> {caseDoc.inviteUsed ? "(used)" : "(not used)"}
+              Invite Code: <code>{caseDoc.inviteCode}</code>{" "}
+              {caseDoc.inviteUsed ? "(used)" : "(not used)"}
             </div>
           )}
         </div>
-
-        {  /*
-        <button onClick={loadAll} disabled={busy} style={{ padding: "8px 12px" }}>
-          Refresh
-        </button>
-          */}
-
       </div>
 
       {error && (
-        <div style={{ background: "#fee", border: "1px solid #f99", padding: 10, marginTop: 12 }}>
+        <div
+          style={{
+            background: "#fee",
+            border: "1px solid #f99",
+            padding: 10,
+            marginTop: 12,
+          }}
+        >
           {error}
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "320px 1fr 360px", gap: 16, marginTop: 16 }}>
-        {/* LEFT: Clause list + create */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "320px 1fr 360px",
+          gap: 16,
+          marginTop: 16,
+        }}
+      >
         <div style={{ border: "1px solid #ddd", padding: 12 }}>
           <h3 style={{ marginTop: 0 }}>Clauses</h3>
 
@@ -253,10 +313,15 @@ export default function CasePage() {
             ) : (
               clauses
                 .slice()
-                .sort((a, b) => a.orderIndex - b.orderIndex)
+                .sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0))
                 .map((c) => {
                   const s = statusForClause(c._id);
                   const isSelected = c._id === selectedClauseId;
+
+                  const partyARejected = s?.rejectedBy?.PARTY_A;
+                  const partyBRejected = s?.rejectedBy?.PARTY_B;
+                  const partyAApproved = s?.approvedBy?.PARTY_A;
+                  const partyBApproved = s?.approvedBy?.PARTY_B;
 
                   return (
                     <button
@@ -274,10 +339,18 @@ export default function CasePage() {
                       <div style={{ fontSize: 12, color: "#666" }}>{c.category}</div>
                       {s && (
                         <div style={{ fontSize: 12, marginTop: 6 }}>
-                          <span>Party A: {s.approvedBy?.PARTY_A ? "✅" : "—"}</span>{" "}
-                          <span style={{ marginLeft: 8 }}>Party B: {s.approvedBy?.PARTY_B ? "✅" : "—"}</span>
+                          <span>
+                            Party A: {partyARejected ? "❌" : partyAApproved ? "✅" : "—"}
+                          </span>
                           <span style={{ marginLeft: 8 }}>
-                            {s.isApprovedByBoth ? "✅ Approved" : "⏳ Pending"}
+                            Party B: {partyBRejected ? "❌" : partyBApproved ? "✅" : "—"}
+                          </span>
+                          <span style={{ marginLeft: 8 }}>
+                            {s.overallState === "REJECTED"
+                              ? "❌ Rejected"
+                              : s.isApprovedByBoth
+                              ? "✅ Approved"
+                              : "⏳ Pending"}
                           </span>
                         </div>
                       )}
@@ -288,7 +361,6 @@ export default function CasePage() {
           </div>
         </div>
 
-        {/* CENTER: Editor */}
         <div style={{ border: "1px solid #ddd", padding: 12 }}>
           <h3 style={{ marginTop: 0 }}>Editor</h3>
 
@@ -314,19 +386,18 @@ export default function CasePage() {
                 <button onClick={onApprove} disabled={busy} style={{ padding: "8px 12px" }}>
                   Approve
                 </button>
-                <button onClick={onReject} disabled={busy} style={{ padding: "8px 12px" }}>
+                <button onClick={openRejectModal} disabled={busy} style={{ padding: "8px 12px" }}>
                   Reject
                 </button>
               </div>
 
               <div style={{ fontSize: 12, color: "#666", marginTop: 10 }}>
-                Tip: Reject requires a comment. (We’ll replace the prompt with a UI field later.)
+                Tip: Rejecting a clause requires a written reason.
               </div>
             </>
           )}
         </div>
 
-        {/* RIGHT: Comments */}
         <div style={{ border: "1px solid #ddd", padding: 12 }}>
           <h3 style={{ marginTop: 0 }}>Comments</h3>
 
@@ -343,13 +414,15 @@ export default function CasePage() {
                       <div style={{ fontSize: 12, color: "#777" }}>
                         User:{" "}
                         <code>
-                        {typeof c.userId === "object"
-                            ? (c.userId.email || c.userId.name || "User")
+                          {typeof c.userId === "object"
+                            ? c.userId.email || c.userId.name || "User"
                             : c.userId}
                         </code>
                       </div>
                       <div>{c.message}</div>
-                      <div style={{ fontSize: 11, color: "#999" }}>{new Date(c.createdAt).toLocaleString()}</div>
+                      <div style={{ fontSize: 11, color: "#999" }}>
+                        {new Date(c.createdAt).toLocaleString()}
+                      </div>
                     </div>
                   ))
                 )}
@@ -370,6 +443,64 @@ export default function CasePage() {
           )}
         </div>
       </div>
+
+      {rejectModalOpen && (
+        <div
+          onClick={closeRejectModal}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+            zIndex: 1000,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: 520,
+              background: "#fff",
+              borderRadius: 10,
+              padding: 16,
+              boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+            }}
+          >
+            <h3 style={{ marginTop: 0 }}>Reject Clause</h3>
+            <p style={{ color: "#555" }}>
+              Enter the reason for rejecting this clause.
+            </p>
+
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              rows={5}
+              placeholder="Explain what needs to change..."
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                padding: 10,
+                border: "1px solid #ccc",
+                borderRadius: 6,
+                resize: "vertical",
+                marginBottom: 12,
+              }}
+            />
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button type="button" onClick={closeRejectModal} disabled={busy}>
+                Cancel
+              </button>
+              <button type="button" onClick={onRejectConfirm} disabled={busy}>
+                {busy ? "Submitting..." : "Submit Rejection"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
