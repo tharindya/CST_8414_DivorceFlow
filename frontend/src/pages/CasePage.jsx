@@ -12,6 +12,8 @@ export default function CasePage() {
   const [templateDetails, setTemplateDetails] = useState(null);
   const [templateValues, setTemplateValues] = useState({});
   const [exportCheck, setExportCheck] = useState(null);
+  const [mockReview, setMockReview] = useState(null);
+  const [reviewBusy, setReviewBusy] = useState(false);
 
   const [selectedClauseId, setSelectedClauseId] = useState(null);
   const selectedClause = useMemo(
@@ -48,6 +50,19 @@ export default function CasePage() {
     }
   }
 
+  async function onRunMockReview() {
+    try {
+      setError("");
+      setReviewBusy(true);
+      const data = await api.getMockReview(caseId);
+      setMockReview(data);
+    } catch (err) {
+      setError(err.message || "Failed to run mock review");
+    } finally {
+      setReviewBusy(false);
+    }
+  }
+
   async function loadAll() {
     setError("");
     setLoading(true);
@@ -65,6 +80,7 @@ export default function CasePage() {
       setClauses(loadedClauses);
       setStatusRows(statusRes.clauses || []);
       setTemplates(loadedTemplates);
+      setMockReview(null);
       await loadExportCheck(caseRes.case);
 
       const first = loadedClauses[0];
@@ -196,6 +212,7 @@ export default function CasePage() {
 
       setStatusRows(statusRes.clauses || []);
       setCaseDoc(nextCase);
+      setMockReview(null);
       await loadExportCheck(nextCase);
 
       setSelectedTemplateId("");
@@ -231,6 +248,7 @@ export default function CasePage() {
 
       setStatusRows(statusRes.clauses || []);
       setCaseDoc(nextCase);
+      setMockReview(null);
       await loadExportCheck(nextCase);
     } catch (err) {
       setError(err.message || "Failed to save clause");
@@ -249,6 +267,7 @@ export default function CasePage() {
     try {
       await api.addComment(selectedClause._id, { message: commentText });
       setCommentText("");
+      setMockReview(null);
       await loadCommentsForClause(selectedClause._id);
     } catch (err) {
       setError(err.message || "Failed to add comment");
@@ -271,6 +290,7 @@ export default function CasePage() {
 
       setStatusRows(statusRes.clauses || []);
       setCaseDoc(nextCase);
+      setMockReview(null);
       await loadExportCheck(nextCase);
     } catch (err) {
       setError(err.message || "Failed to approve");
@@ -314,6 +334,7 @@ export default function CasePage() {
 
       setStatusRows(statusRes.clauses || []);
       setCaseDoc(nextCase);
+      setMockReview(null);
       await loadExportCheck(nextCase);
 
       setRejectModalOpen(false);
@@ -425,6 +446,93 @@ export default function CasePage() {
           )}
         </div>
       )}
+
+      <div
+        style={{
+          marginTop: 12,
+          border: "1px solid #d9d9d9",
+          background: "#fafafa",
+          padding: 12,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 8,
+          }}
+        >
+          <div style={{ fontWeight: 700 }}>Mock Legal Review</div>
+          <button
+            onClick={onRunMockReview}
+            disabled={reviewBusy || busy}
+            style={{ padding: "8px 12px" }}
+          >
+            {reviewBusy ? "Running Review..." : "Run Review"}
+          </button>
+        </div>
+
+        {!mockReview ? (
+          <div style={{ fontSize: 13, color: "#666" }}>
+            Run a simulated review to generate demo legal-review feedback.
+          </div>
+        ) : (
+          <>
+            <div style={{ fontSize: 13, marginBottom: 8 }}>
+              <b>Summary:</b> {mockReview.summary}
+            </div>
+
+            <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>
+              {mockReview.disclaimer}
+            </div>
+
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Issues</div>
+              {mockReview.issues?.length ? (
+                <div style={{ display: "grid", gap: 8 }}>
+                  {mockReview.issues.map((issue, index) => (
+                    <div
+                      key={`${issue.title}-${index}`}
+                      style={{
+                        border: "1px solid #e6e6e6",
+                        background: "#fff",
+                        padding: 10,
+                      }}
+                    >
+                      <div style={{ fontWeight: 700 }}>
+                        {issue.title}{" "}
+                        <span style={{ fontWeight: 400, color: "#666" }}>
+                          ({issue.severity})
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 13, marginTop: 4 }}>{issue.message}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: "#666" }}>No issues returned.</div>
+              )}
+            </div>
+
+            <div>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Suggestions</div>
+              {mockReview.suggestions?.length ? (
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {mockReview.suggestions.map((suggestion, index) => (
+                    <li key={`${suggestion}-${index}`} style={{ marginBottom: 4 }}>
+                      {suggestion}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div style={{ fontSize: 13, color: "#666" }}>No suggestions returned.</div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
 
       {error && (
         <div

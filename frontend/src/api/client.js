@@ -127,6 +127,9 @@ export const api = {
   // export
   getExportCheck: (caseId) => request(`/cases/${caseId}/export/check`),
 
+  //Mock Review
+  getMockReview: (caseId) => request(`/cases/${caseId}/mock-review`),
+
   downloadCasePdf: async (caseId) => {
     const token = getToken();
 

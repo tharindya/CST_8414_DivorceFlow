@@ -4,6 +4,7 @@ const cors = require("cors");
 const authRoutes = require("./routes/auth.routes");
 const templateRoutes = require("./routes/template.routes");
 const exportRoutes = require("./routes/export.routes");
+const mockReviewRoutes = require("./routes/mockReview.routes");
 const { errorHandler } = require("./middleware/error");
 
 const app = express();
@@ -29,6 +30,7 @@ app.use("/", require("./routes/clause.routes"));
 app.use("/", require("./routes/workflow.routes"));
 app.use("/", exportRoutes);
 app.use("/", templateRoutes);
+app.use("/", mockReviewRoutes);
 
 // Error handler must be last
 app.use(errorHandler);
