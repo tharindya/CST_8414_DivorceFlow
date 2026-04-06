@@ -205,10 +205,7 @@ export default function Dashboard() {
 
               <div style={{ display: "flex", gap: 10 }}>
                 <Link to={`/cases/${c._id}`}>Open</Link>
-                <button
-                  onClick={() => onResendInvite(c._id)}
-                  style={{ padding: "6px 10px" }}
-                >
+                <button onClick={() => onResendInvite(c._id)} style={{ padding: "6px 10px" }}>
                   Send Invite
                 </button>
               </div>
