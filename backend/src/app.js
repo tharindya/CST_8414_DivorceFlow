@@ -26,7 +26,7 @@ app.use("/auth", authRoutes);
 app.use("/cases", require("./routes/case.routes"));
 app.use("/", require("./routes/clause.routes"));
 app.use("/", require("./routes/workflow.routes"));
-app.use("/api", exportRoutes);
+app.use("/", exportRoutes);
 
 
 // Error handler must be last
