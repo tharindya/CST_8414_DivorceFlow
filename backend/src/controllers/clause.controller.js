@@ -6,7 +6,9 @@ async function listClauses(req, res, next) {
 
     const clauses = await Clause.find({ caseId })
       .sort({ orderIndex: 1, createdAt: 1 })
-      .select("_id caseId title category orderIndex contentCurrent updatedAt updatedBy");
+      .select(
+        "_id caseId title category orderIndex contentCurrent templateId templateTitle templateJurisdiction templateReviewStatus templateReviewedBy templateReviewedOn templateDisclaimer updatedAt updatedBy"
+      );
 
     res.json({ clauses });
   } catch (err) {
@@ -17,7 +19,18 @@ async function listClauses(req, res, next) {
 async function createClause(req, res, next) {
   try {
     const { caseId } = req.params;
-    const { title, category, contentCurrent } = req.body;
+    const {
+      title,
+      category,
+      contentCurrent,
+      templateId,
+      templateTitle,
+      templateJurisdiction,
+      templateReviewStatus,
+      templateReviewedBy,
+      templateReviewedOn,
+      templateDisclaimer,
+    } = req.body;
 
     if (!title || title.trim().length < 2) {
       return res.status(400).json({ error: "title must be at least 2 characters" });
@@ -35,6 +48,15 @@ async function createClause(req, res, next) {
       category: category?.trim() || "General",
       orderIndex: nextIndex,
       contentCurrent: typeof contentCurrent === "string" ? contentCurrent : "",
+
+      templateId: templateId || null,
+      templateTitle: templateTitle || null,
+      templateJurisdiction: templateJurisdiction || null,
+      templateReviewStatus: templateReviewStatus || null,
+      templateReviewedBy: templateReviewedBy || null,
+      templateReviewedOn: templateReviewedOn || null,
+      templateDisclaimer: templateDisclaimer || null,
+
       updatedBy: req.user.id,
     });
 

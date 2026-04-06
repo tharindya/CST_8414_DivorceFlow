@@ -132,6 +132,15 @@ export default function CasePage() {
       setDraftContent(data.content || "");
       setNewTitle(data.template?.title || newTitle);
       setNewCategory(data.template?.category || newCategory);
+
+      setTemplateDetails((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...data.template,
+            }
+          : data.template || null
+      );
     } catch (err) {
       setError(err.message || "Failed to generate template draft");
     } finally {
@@ -149,6 +158,14 @@ export default function CasePage() {
         title: newTitle,
         category: newCategory,
         contentCurrent: draftContent,
+
+        templateId: templateDetails?.id || null,
+        templateTitle: templateDetails?.title || null,
+        templateJurisdiction: templateDetails?.jurisdiction || null,
+        templateReviewStatus: templateDetails?.reviewStatus || null,
+        templateReviewedBy: templateDetails?.reviewedBy || null,
+        templateReviewedOn: templateDetails?.reviewedOn || null,
+        templateDisclaimer: templateDetails?.disclaimer || null,
       });
 
       const created = data.clause;
@@ -499,6 +516,11 @@ export default function CasePage() {
                     >
                       <div style={{ fontWeight: 700 }}>{c.title}</div>
                       <div style={{ fontSize: 12, color: "#666" }}>{c.category}</div>
+                      {c.templateTitle && (
+                        <div style={{ fontSize: 11, color: "#666", marginTop: 4 }}>
+                          Template: <b>{c.templateTitle}</b>
+                        </div>
+                      )}
                       {s && (
                         <div style={{ fontSize: 12, marginTop: 6 }}>
                           <span>
@@ -533,6 +555,49 @@ export default function CasePage() {
               <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>
                 Editing: <b>{selectedClause.title}</b>
               </div>
+
+              {selectedClause.templateId && (
+                <div
+                  style={{
+                    border: "1px solid #e6e6e6",
+                    background: "#fafafa",
+                    padding: 10,
+                    display: "grid",
+                    gap: 8,
+                    marginBottom: 12,
+                  }}
+                >
+                  <div style={{ fontWeight: 700 }}>Template Source</div>
+                  <div style={{ fontSize: 12 }}>
+                    Template: <b>{selectedClause.templateTitle || "Unknown template"}</b>
+                  </div>
+                  <div style={{ fontSize: 12 }}>
+                    Jurisdiction: <b>{selectedClause.templateJurisdiction || "Unknown"}</b>
+                  </div>
+                  <div style={{ fontSize: 12 }}>
+                    Review Status: <b>{selectedClause.templateReviewStatus || "UNKNOWN"}</b>
+                  </div>
+                  <div style={{ fontSize: 12 }}>
+                    Reviewed By: <b>{selectedClause.templateReviewedBy || "Not specified"}</b>
+                  </div>
+                  <div style={{ fontSize: 12 }}>
+                    Reviewed On: <b>{selectedClause.templateReviewedOn || "Not yet reviewed"}</b>
+                  </div>
+                  {selectedClause.templateDisclaimer && (
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "#7a4d00",
+                        background: "#fff6df",
+                        border: "1px solid #f0d58a",
+                        padding: 8,
+                      }}
+                    >
+                      {selectedClause.templateDisclaimer}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <textarea
                 value={draftContent}

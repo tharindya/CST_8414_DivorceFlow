@@ -7,6 +7,15 @@ const clauseSchema = new mongoose.Schema(
     category: { type: String, default: "General", trim: true },
     orderIndex: { type: Number, default: 0 },
     contentCurrent: { type: String, default: "" },
+
+    templateId: { type: String, default: null },
+    templateTitle: { type: String, default: null },
+    templateJurisdiction: { type: String, default: null },
+    templateReviewStatus: { type: String, default: null },
+    templateReviewedBy: { type: String, default: null },
+    templateReviewedOn: { type: String, default: null },
+    templateDisclaimer: { type: String, default: null },
+
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true }
