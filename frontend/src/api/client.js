@@ -75,7 +75,13 @@ export const api = {
 
   // templates
   listTemplates: (jurisdiction) =>
-    request(`/templates?jurisdiction=${encodeURIComponent(jurisdiction || "General")}`),
+  request(`/templates?jurisdiction=${encodeURIComponent(jurisdiction || "General")}`),
+
+  buildTemplateDraft: (templateId, values) =>
+    request(`/templates/${templateId}/build`, {
+      method: "POST",
+      body: JSON.stringify({ values }),
+    }),
 
   // clauses
   listClauses: (caseId) => request(`/cases/${caseId}/clauses`),
@@ -113,6 +119,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+
+
 
   downloadCasePdf: async (caseId) => {
     const token = getToken();

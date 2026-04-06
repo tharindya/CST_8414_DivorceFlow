@@ -9,6 +9,8 @@ export default function CasePage() {
   const [clauses, setClauses] = useState([]);
   const [statusRows, setStatusRows] = useState([]);
   const [templates, setTemplates] = useState([]);
+  const [templateDetails, setTemplateDetails] = useState(null);
+  const [templateValues, setTemplateValues] = useState({});
 
   const [selectedClauseId, setSelectedClauseId] = useState(null);
   const selectedClause = useMemo(
@@ -42,11 +44,12 @@ export default function CasePage() {
       const templateRes = await api.listTemplates(caseRes.case?.jurisdiction || "General");
 
       const loadedClauses = clauseRes.clauses || [];
+      const loadedTemplates = templateRes.templates || [];
 
       setCaseDoc(caseRes.case);
       setClauses(loadedClauses);
       setStatusRows(statusRes.clauses || []);
-      setTemplates(templateRes.templates || []);
+      setTemplates(loadedTemplates);
 
       const first = loadedClauses[0];
       if (!selectedClauseId && first?._id) {
@@ -96,15 +99,43 @@ export default function CasePage() {
   function onSelectTemplate(templateId) {
     setSelectedTemplateId(templateId);
 
-    const template = templates.find((t) => t.id === templateId);
+    const template = templates.find((t) => t.id === templateId) || null;
+    setTemplateDetails(template);
+    setTemplateValues({});
+
     if (template) {
       setNewTitle(template.title);
       setNewCategory(template.category);
-      setDraftContent(template.content || "");
+      setDraftContent("");
     } else {
       setNewTitle("");
       setNewCategory("General");
       setDraftContent("");
+    }
+  }
+
+  function onTemplateValueChange(key, value) {
+    setTemplateValues((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  }
+
+  async function onGenerateFromTemplate() {
+    if (!selectedTemplateId) return;
+
+    try {
+      setError("");
+      setBusy(true);
+
+      const data = await api.buildTemplateDraft(selectedTemplateId, templateValues);
+      setDraftContent(data.content || "");
+      setNewTitle(data.template?.title || newTitle);
+      setNewCategory(data.template?.category || newCategory);
+    } catch (err) {
+      setError(err.message || "Failed to generate template draft");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -132,6 +163,8 @@ export default function CasePage() {
       setCaseDoc((prev) => (prev ? { ...prev, status: statusRes.caseStatus } : prev));
 
       setSelectedTemplateId("");
+      setTemplateDetails(null);
+      setTemplateValues({});
       setNewTitle("");
       setNewCategory("General");
       setDraftContent("");
@@ -298,6 +331,7 @@ export default function CasePage() {
             </div>
           )}
         </div>
+
         <div style={{ display: "flex", gap: 10 }}>
           {caseDoc?.status === "READY" && (
             <button onClick={onDownloadPdf} disabled={busy} style={{ padding: "8px 12px" }}>
@@ -348,15 +382,88 @@ export default function CasePage() {
             <input
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
-              placeholder="New clause title (e.g., Child Custody)"
+              placeholder="New clause title"
               style={{ padding: 10 }}
             />
             <input
               value={newCategory}
               onChange={(e) => setNewCategory(e.target.value)}
-              placeholder="Category (e.g., Custody)"
+              placeholder="Category"
               style={{ padding: 10 }}
             />
+
+            {templateDetails && (
+              <div
+                style={{
+                  border: "1px solid #e6e6e6",
+                  background: "#fafafa",
+                  padding: 10,
+                  display: "grid",
+                  gap: 8,
+                }}
+              >
+                <div style={{ fontWeight: 700 }}>{templateDetails.title}</div>
+                <div style={{ fontSize: 12, color: "#666" }}>
+                  {templateDetails.description}
+                </div>
+                <div style={{ fontSize: 12 }}>
+                  Review Status: <b>{templateDetails.reviewStatus || "UNKNOWN"}</b>
+                </div>
+                <div style={{ fontSize: 12 }}>
+                  Reviewed By: <b>{templateDetails.reviewedBy || "Not specified"}</b>
+                </div>
+                <div style={{ fontSize: 12 }}>
+                  Reviewed On: <b>{templateDetails.reviewedOn || "Not yet reviewed"}</b>
+                </div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "#7a4d00",
+                    background: "#fff6df",
+                    border: "1px solid #f0d58a",
+                    padding: 8,
+                  }}
+                >
+                  {templateDetails.disclaimer}
+                </div>
+
+                {(templateDetails.placeholders || []).map((field) => (
+                  <div key={field.key} style={{ display: "grid", gap: 4 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600 }}>
+                      {field.label}
+                      {field.required ? " *" : ""}
+                    </label>
+
+                    {field.type === "textarea" ? (
+                      <textarea
+                        value={templateValues[field.key] || ""}
+                        onChange={(e) => onTemplateValueChange(field.key, e.target.value)}
+                        placeholder={field.placeholder || ""}
+                        rows={4}
+                        style={{ padding: 8, resize: "vertical" }}
+                      />
+                    ) : (
+                      <input
+                        value={templateValues[field.key] || ""}
+                        onChange={(e) => onTemplateValueChange(field.key, e.target.value)}
+                        placeholder={field.placeholder || ""}
+                        style={{ padding: 8 }}
+                      />
+                    )}
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={onGenerateFromTemplate}
+                  disabled={busy}
+                  style={{ padding: 10 }}
+                >
+                  Generate Draft from Template
+                </button>
+              </div>
+            )}
+
             <button disabled={busy || !newTitle.trim()} style={{ padding: 10 }}>
               Add Clause
             </button>
