@@ -14,9 +14,14 @@ function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function normalizeJurisdiction(value) {
+  const allowed = ["General", "Ontario", "Quebec", "British Columbia", "Alberta"];
+  return allowed.includes(value) ? value : "General";
+}
+
 async function createCase(req, res, next) {
   try {
-    const { title, partyBEmail } = req.body;
+    const { title, partyBEmail, jurisdiction } = req.body;
 
     if (!title || title.trim().length < 3) {
       return res.status(400).json({ error: "title must be at least 3 characters" });
@@ -32,6 +37,7 @@ async function createCase(req, res, next) {
     const doc = await Case.create({
       title: title.trim(),
       participants: [{ userId: req.user.id, role: "PARTY_A" }],
+      jurisdiction: normalizeJurisdiction(jurisdiction),
       inviteCode,
       inviteUsed: false,
       status: "DRAFT",
@@ -51,7 +57,7 @@ async function listMyCases(req, res, next) {
     const cases = await Case.find({ "participants.userId": req.user.id })
       .sort({ updatedAt: -1 })
       .select(
-        "_id title status participants inviteCode inviteUsed partyBEmail invitationStatus createdAt updatedAt"
+        "_id title status participants jurisdiction inviteCode inviteUsed partyBEmail invitationStatus createdAt updatedAt"
       );
 
     res.json({ cases });
@@ -65,7 +71,7 @@ async function getCase(req, res, next) {
     const { caseId } = req.params;
 
     const doc = await Case.findById(caseId).select(
-      "_id title status participants inviteCode inviteUsed partyBEmail invitationStatus createdAt updatedAt"
+      "_id title status participants jurisdiction inviteCode inviteUsed partyBEmail invitationStatus createdAt updatedAt"
     );
 
     if (!doc) return res.status(404).json({ error: "Case not found" });
@@ -169,7 +175,7 @@ async function getInviteByToken(req, res, next) {
     const doc = await Case.findOne({
       _id: caseId,
       inviteToken: token,
-    }).select("_id title inviteCode inviteUsed invitationStatus partyBEmail status");
+    }).select("_id title jurisdiction inviteCode inviteUsed invitationStatus partyBEmail status");
 
     if (!doc) {
       return res.status(404).json({ error: "Invitation not found or invalid" });

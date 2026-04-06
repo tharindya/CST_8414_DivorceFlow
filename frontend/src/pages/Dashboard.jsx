@@ -12,6 +12,7 @@ export default function Dashboard() {
 
   const [newTitle, setNewTitle] = useState("Divorce Agreement - A & B");
   const [partyBEmail, setPartyBEmail] = useState("");
+  const [jurisdiction, setJurisdiction] = useState("General");
   const [creating, setCreating] = useState(false);
 
   const [joinCaseId, setJoinCaseId] = useState("");
@@ -44,6 +45,7 @@ export default function Dashboard() {
       const data = await api.createCase({
         title: newTitle,
         partyBEmail,
+        jurisdiction,
       });
 
       await api.sendInvite(data.case._id);
@@ -118,6 +120,17 @@ export default function Dashboard() {
               style={{ padding: 10 }}
               placeholder="Other party email"
             />
+            <select
+              value={jurisdiction}
+              onChange={(e) => setJurisdiction(e.target.value)}
+              style={{ padding: 10 }}
+            >
+              <option value="General">General</option>
+              <option value="Ontario">Ontario</option>
+              <option value="Quebec">Quebec</option>
+              <option value="British Columbia">British Columbia</option>
+              <option value="Alberta">Alberta</option>
+            </select>
             <button disabled={creating} style={{ padding: 10 }}>
               {creating ? "Creating..." : "Create Case and Send Invite"}
             </button>
@@ -175,6 +188,9 @@ export default function Dashboard() {
                 <div style={{ fontWeight: 700 }}>{c.title}</div>
                 <div style={{ fontSize: 13, color: "#555" }}>
                   Status: <b>{c.status}</b>
+                </div>
+                <div style={{ fontSize: 12, color: "#777" }}>
+                  Jurisdiction: <b>{c.jurisdiction || "General"}</b>
                 </div>
                 <div style={{ fontSize: 12, color: "#777" }}>
                   Case ID: <code>{c._id}</code>

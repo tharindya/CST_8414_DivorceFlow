@@ -18,6 +18,12 @@ const caseSchema = new mongoose.Schema(
     },
     participants: { type: [participantSchema], default: [] },
 
+    jurisdiction: {
+      type: String,
+      enum: ["General", "Ontario", "Quebec", "British Columbia", "Alberta"],
+      default: "General",
+    },
+
     inviteCode: { type: String, required: true },
     inviteUsed: { type: Boolean, default: false },
 

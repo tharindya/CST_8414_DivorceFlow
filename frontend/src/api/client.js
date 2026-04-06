@@ -73,6 +73,10 @@ export const api = {
 
   getCase: (caseId) => request(`/cases/${caseId}`),
 
+  // templates
+  listTemplates: (jurisdiction) =>
+    request(`/templates?jurisdiction=${encodeURIComponent(jurisdiction || "General")}`),
+
   // clauses
   listClauses: (caseId) => request(`/cases/${caseId}/clauses`),
 
@@ -130,14 +134,14 @@ export const api = {
       throw new Error(message);
     }
 
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "divorce-agreement.pdf";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "divorce-agreement.pdf";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
   },
 };

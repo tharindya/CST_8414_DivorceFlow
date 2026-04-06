@@ -8,6 +8,7 @@ export default function CasePage() {
   const [caseDoc, setCaseDoc] = useState(null);
   const [clauses, setClauses] = useState([]);
   const [statusRows, setStatusRows] = useState([]);
+  const [templates, setTemplates] = useState([]);
 
   const [selectedClauseId, setSelectedClauseId] = useState(null);
   const selectedClause = useMemo(
@@ -20,6 +21,7 @@ export default function CasePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState("General");
 
@@ -34,17 +36,17 @@ export default function CasePage() {
     setLoading(true);
 
     try {
-      const [caseRes, clauseRes, statusRes] = await Promise.all([
-        api.getCase(caseId),
-        api.listClauses(caseId),
-        api.getClauseStatus(caseId),
-      ]);
+      const caseRes = await api.getCase(caseId);
+      const clauseRes = await api.listClauses(caseId);
+      const statusRes = await api.getClauseStatus(caseId);
+      const templateRes = await api.listTemplates(caseRes.case?.jurisdiction || "General");
 
       const loadedClauses = clauseRes.clauses || [];
 
       setCaseDoc(caseRes.case);
       setClauses(loadedClauses);
       setStatusRows(statusRes.clauses || []);
+      setTemplates(templateRes.templates || []);
 
       const first = loadedClauses[0];
       if (!selectedClauseId && first?._id) {
@@ -91,6 +93,21 @@ export default function CasePage() {
     return statusRows.find((s) => s.clauseId === clauseId) || null;
   }
 
+  function onSelectTemplate(templateId) {
+    setSelectedTemplateId(templateId);
+
+    const template = templates.find((t) => t.id === templateId);
+    if (template) {
+      setNewTitle(template.title);
+      setNewCategory(template.category);
+      setDraftContent(template.content || "");
+    } else {
+      setNewTitle("");
+      setNewCategory("General");
+      setDraftContent("");
+    }
+  }
+
   async function onCreateClause(e) {
     e.preventDefault();
     setError("");
@@ -100,6 +117,7 @@ export default function CasePage() {
       const data = await api.createClause(caseId, {
         title: newTitle,
         category: newCategory,
+        contentCurrent: draftContent,
       });
 
       const created = data.clause;
@@ -113,8 +131,10 @@ export default function CasePage() {
       setStatusRows(statusRes.clauses || []);
       setCaseDoc((prev) => (prev ? { ...prev, status: statusRes.caseStatus } : prev));
 
+      setSelectedTemplateId("");
       setNewTitle("");
       setNewCategory("General");
+      setDraftContent("");
       setSelectedClauseId(created._id);
     } catch (err) {
       setError(err.message || "Failed to create clause");
@@ -268,6 +288,9 @@ export default function CasePage() {
           <div style={{ fontSize: 13, color: "#555" }}>
             Status: <b>{caseDoc?.status}</b> &nbsp; | &nbsp; Case ID: <code>{caseId}</code>
           </div>
+          <div style={{ fontSize: 13, color: "#555" }}>
+            Jurisdiction: <b>{caseDoc?.jurisdiction || "General"}</b>
+          </div>
           {caseDoc?.inviteCode && (
             <div style={{ fontSize: 13, color: "#555" }}>
               Invite Code: <code>{caseDoc.inviteCode}</code>{" "}
@@ -309,6 +332,19 @@ export default function CasePage() {
           <h3 style={{ marginTop: 0 }}>Clauses</h3>
 
           <form onSubmit={onCreateClause} style={{ display: "grid", gap: 8, marginBottom: 12 }}>
+            <select
+              value={selectedTemplateId}
+              onChange={(e) => onSelectTemplate(e.target.value)}
+              style={{ padding: 10 }}
+            >
+              <option value="">Custom Clause</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.title} ({t.jurisdiction})
+                </option>
+              ))}
+            </select>
+
             <input
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}

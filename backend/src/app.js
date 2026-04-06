@@ -2,8 +2,9 @@ const express = require("express");
 const cors = require("cors");
 
 const authRoutes = require("./routes/auth.routes");
-const { errorHandler } = require("./middleware/error");
+const templateRoutes = require("./routes/template.routes");
 const exportRoutes = require("./routes/export.routes");
+const { errorHandler } = require("./middleware/error");
 
 const app = express();
 
@@ -27,7 +28,7 @@ app.use("/cases", require("./routes/case.routes"));
 app.use("/", require("./routes/clause.routes"));
 app.use("/", require("./routes/workflow.routes"));
 app.use("/", exportRoutes);
-
+app.use("/", templateRoutes);
 
 // Error handler must be last
 app.use(errorHandler);
