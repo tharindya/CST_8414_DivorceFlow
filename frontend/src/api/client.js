@@ -109,4 +109,35 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+
+  downloadCasePdf: async (caseId) => {
+    const token = getToken();
+
+    const res = await fetch(`${API_BASE}/cases/${caseId}/export/pdf`, {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    if (!res.ok) {
+      let message = `Request failed: ${res.status}`;
+      try {
+        const data = await res.json();
+        message = data?.error || message;
+      } catch {
+        // ignore JSON parse failure for non-JSON error body
+      }
+      throw new Error(message);
+    }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "divorce-agreement.pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+  },
 };

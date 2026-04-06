@@ -223,6 +223,18 @@ export default function CasePage() {
     }
   }
 
+  async function onDownloadPdf() {
+    try {
+      setError("");
+      setBusy(true);
+      await api.downloadCasePdf(caseId);
+    } catch (err) {
+      setError(err.message || "Failed to export PDF");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   useEffect(() => {
     function handleKeyDown(e) {
       if (e.key === "Escape" && rejectModalOpen && !busy) {
@@ -261,6 +273,13 @@ export default function CasePage() {
               Invite Code: <code>{caseDoc.inviteCode}</code>{" "}
               {caseDoc.inviteUsed ? "(used)" : "(not used)"}
             </div>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          {caseDoc?.status === "READY" && (
+            <button onClick={onDownloadPdf} disabled={busy} style={{ padding: "8px 12px" }}>
+              Download PDF
+            </button>
           )}
         </div>
       </div>
