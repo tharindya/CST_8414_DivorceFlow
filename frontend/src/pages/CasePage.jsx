@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api } from "../api/client";
+import "../styles/case-page.css";
 
 export default function CasePage() {
   const { caseId } = useParams();
@@ -370,74 +371,84 @@ export default function CasePage() {
   }, [rejectModalOpen, busy]);
 
   if (loading) {
-    return <div style={{ padding: 16 }}>Loading...</div>;
+    return <div className="case-page">Loading...</div>;
   }
 
   return (
-    <div style={{ maxWidth: 1200, margin: "24px auto", padding: 16 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 12,
-        }}
-      >
-        <div>
-          <div style={{ fontSize: 14, color: "#666" }}>
-            <Link to="/dashboard">← Back</Link>
-          </div>
-          <h2 style={{ margin: "6px 0" }}>{caseDoc?.title || "Case"}</h2>
-          <div style={{ fontSize: 13, color: "#555" }}>
-            Status: <b>{caseDoc?.status}</b> &nbsp; | &nbsp; Case ID: <code>{caseId}</code>
-          </div>
-          <div style={{ fontSize: 13, color: "#555" }}>
-            Jurisdiction: <b>{caseDoc?.jurisdiction || "General"}</b>
-          </div>
-          {caseDoc?.inviteCode && (
-            <div style={{ fontSize: 13, color: "#555" }}>
-              Invite Code: <code>{caseDoc.inviteCode}</code>{" "}
-              {caseDoc.inviteUsed ? "(used)" : "(not used)"}
+    <div className="case-page">
+      <div className="case-header">
+        <div className="case-header-main">
+          <Link to="/dashboard" className="case-back-link">
+            <span>←</span>
+            <span>Back to Dashboard</span>
+          </Link>
+
+          <h2 className="case-title">{caseDoc?.title || "Case"}</h2>
+
+          <div className="case-meta-row">
+            <div className="case-meta-group case-meta-group-left">
+              <div
+                className={`case-status-badge ${
+                  caseDoc?.status === "READY"
+                    ? "case-status-ready"
+                    : caseDoc?.status === "NEGOTIATING"
+                    ? "case-status-negotiating"
+                    : caseDoc?.status === "REJECTED"
+                    ? "case-status-rejected"
+                    : "case-status-draft"
+                }`}
+              >
+                {caseDoc?.status || "DRAFT"}
+              </div>
+
+              <div className="case-meta-chip">
+                <span className="case-meta-label">Jurisdiction</span>
+                <b>{caseDoc?.jurisdiction || "General"}</b>
+              </div>
             </div>
-          )}
+
+            <div className="case-meta-group case-meta-group-right">
+              <div className="case-meta-chip">
+                <span className="case-meta-label">Case ID</span>
+                <code>{caseId}</code>
+              </div>
+
+              {caseDoc?.inviteCode && (
+                <div className="case-meta-chip">
+                  <span className="case-meta-label">Invite</span>
+                  <code>{caseDoc.inviteCode}</code>
+                  <span>{caseDoc.inviteUsed ? "used" : "not used"}</span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10 }}>
-          {caseDoc?.status === "READY" && (
-            <button onClick={onDownloadPdf} disabled={busy} style={{ padding: "8px 12px" }}>
+        {caseDoc?.status === "READY" && (
+          <div className="case-header-actions">
+            <button onClick={onDownloadPdf} disabled={busy} className="button button-primary">
               Download PDF
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {caseDoc?.status === "READY" && exportCheck && (
-        <div
-          style={{
-            marginTop: 12,
-            border: "1px solid #f0d58a",
-            background: "#fff6df",
-            padding: 12,
-          }}
-        >
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>
-            Drafting Completeness Review
-          </div>
+        <div className="review-panel review-panel-warning">
+          <div className="review-title">Drafting Completeness Review</div>
 
-          <div style={{ fontSize: 12, color: "#7a4d00", marginBottom: 8 }}>
+          <div className="review-subtle review-subtle-warning">
             {exportCheck.disclaimer}
           </div>
 
           {exportCheck.warnings?.length === 0 ? (
-            <div style={{ color: "#1f6f2a", fontWeight: 600 }}>
-              No major missing sections were detected.
-            </div>
+            <div className="review-ok">No major missing sections were detected.</div>
           ) : (
             <>
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>Warnings:</div>
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
+              <div className="review-title">Warnings:</div>
+              <ul className="list">
                 {exportCheck.warnings.map((warning) => (
-                  <li key={warning} style={{ marginBottom: 4 }}>
+                  <li key={warning} className="list-item">
                     {warning}
                   </li>
                 ))}
@@ -447,35 +458,20 @@ export default function CasePage() {
         </div>
       )}
 
-      <div
-        style={{
-          marginTop: 12,
-          border: "1px solid #d9d9d9",
-          background: "#fafafa",
-          padding: 12,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 12,
-            marginBottom: 8,
-          }}
-        >
-          <div style={{ fontWeight: 700 }}>Mock Legal Review</div>
+      <div className="review-panel review-panel-neutral">
+        <div className="review-panel-header">
+          <div className="review-title">Mock Legal Review</div>
           <button
             onClick={onRunMockReview}
             disabled={reviewBusy || busy}
-            style={{ padding: "8px 12px" }}
+            className="button"
           >
             {reviewBusy ? "Running Review..." : "Run Review"}
           </button>
         </div>
 
         {!mockReview ? (
-          <div style={{ fontSize: 13, color: "#666" }}>
+          <div className="muted">
             Run a simulated review to generate demo legal-review feedback.
           </div>
         ) : (
@@ -484,85 +480,56 @@ export default function CasePage() {
               <b>Summary:</b> {mockReview.summary}
             </div>
 
-            <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>
-              {mockReview.disclaimer}
-            </div>
+            <div className="review-subtle">{mockReview.disclaimer}</div>
 
             <div style={{ marginBottom: 10 }}>
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>Issues</div>
+              <div className="review-title">Issues</div>
               {mockReview.issues?.length ? (
-                <div style={{ display: "grid", gap: 8 }}>
+                <div className="issue-list">
                   {mockReview.issues.map((issue, index) => (
-                    <div
-                      key={`${issue.title}-${index}`}
-                      style={{
-                        border: "1px solid #e6e6e6",
-                        background: "#fff",
-                        padding: 10,
-                      }}
-                    >
-                      <div style={{ fontWeight: 700 }}>
+                    <div key={`${issue.title}-${index}`} className="issue-card">
+                      <div className="issue-title">
                         {issue.title}{" "}
-                        <span style={{ fontWeight: 400, color: "#666" }}>
-                          ({issue.severity})
-                        </span>
+                        <span className="issue-severity">({issue.severity})</span>
                       </div>
-                      <div style={{ fontSize: 13, marginTop: 4 }}>{issue.message}</div>
+                      <div className="issue-message">{issue.message}</div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div style={{ fontSize: 13, color: "#666" }}>No issues returned.</div>
+                <div className="muted">No issues returned.</div>
               )}
             </div>
 
             <div>
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>Suggestions</div>
+              <div className="review-title">Suggestions</div>
               {mockReview.suggestions?.length ? (
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                <ul className="list">
                   {mockReview.suggestions.map((suggestion, index) => (
-                    <li key={`${suggestion}-${index}`} style={{ marginBottom: 4 }}>
+                    <li key={`${suggestion}-${index}`} className="list-item">
                       {suggestion}
                     </li>
                   ))}
                 </ul>
               ) : (
-                <div style={{ fontSize: 13, color: "#666" }}>No suggestions returned.</div>
+                <div className="muted">No suggestions returned.</div>
               )}
             </div>
           </>
         )}
       </div>
 
-      {error && (
-        <div
-          style={{
-            background: "#fee",
-            border: "1px solid #f99",
-            padding: 10,
-            marginTop: 12,
-          }}
-        >
-          {error}
-        </div>
-      )}
+      {error && <div className="alert alert-error">{error}</div>}
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "320px 1fr 360px",
-          gap: 16,
-          marginTop: 16,
-        }}
-      >
-        <div style={{ border: "1px solid #ddd", padding: 12 }}>
-          <h3 style={{ marginTop: 0 }}>Clauses</h3>
+      <div className="workspace-grid">
+        <div className="panel">
+          <h3 className="panel-title">Clauses</h3>
 
-          <form onSubmit={onCreateClause} style={{ display: "grid", gap: 8, marginBottom: 12 }}>
+          <form onSubmit={onCreateClause} className="form-grid form-section">
             <select
               value={selectedTemplateId}
               onChange={(e) => onSelectTemplate(e.target.value)}
-              style={{ padding: 10 }}
+              className="select"
             >
               <option value="">Custom Clause</option>
               {templates.map((t) => (
@@ -576,53 +543,37 @@ export default function CasePage() {
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               placeholder="New clause title"
-              style={{ padding: 10 }}
+              className="input"
             />
             <input
               value={newCategory}
               onChange={(e) => setNewCategory(e.target.value)}
               placeholder="Category"
-              style={{ padding: 10 }}
+              className="input"
             />
 
             {templateDetails && (
-              <div
-                style={{
-                  border: "1px solid #e6e6e6",
-                  background: "#fafafa",
-                  padding: 10,
-                  display: "grid",
-                  gap: 8,
-                }}
-              >
-                <div style={{ fontWeight: 700 }}>{templateDetails.title}</div>
-                <div style={{ fontSize: 12, color: "#666" }}>
+              <div className="template-box">
+                <div className="template-title">{templateDetails.title}</div>
+                <div className="template-description">
                   {templateDetails.description}
                 </div>
-                <div style={{ fontSize: 12 }}>
+                <div className="muted">
                   Review Status: <b>{templateDetails.reviewStatus || "UNKNOWN"}</b>
                 </div>
-                <div style={{ fontSize: 12 }}>
+                <div className="muted">
                   Reviewed By: <b>{templateDetails.reviewedBy || "Not specified"}</b>
                 </div>
-                <div style={{ fontSize: 12 }}>
+                <div className="muted">
                   Reviewed On: <b>{templateDetails.reviewedOn || "Not yet reviewed"}</b>
                 </div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "#7a4d00",
-                    background: "#fff6df",
-                    border: "1px solid #f0d58a",
-                    padding: 8,
-                  }}
-                >
+                <div className="template-disclaimer">
                   {templateDetails.disclaimer}
                 </div>
 
                 {(templateDetails.placeholders || []).map((field) => (
-                  <div key={field.key} style={{ display: "grid", gap: 4 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600 }}>
+                  <div key={field.key} className="form-grid">
+                    <label className="muted" style={{ fontWeight: 600 }}>
                       {field.label}
                       {field.required ? " *" : ""}
                     </label>
@@ -633,14 +584,14 @@ export default function CasePage() {
                         onChange={(e) => onTemplateValueChange(field.key, e.target.value)}
                         placeholder={field.placeholder || ""}
                         rows={4}
-                        style={{ padding: 8, resize: "vertical" }}
+                        className="textarea"
                       />
                     ) : (
                       <input
                         value={templateValues[field.key] || ""}
                         onChange={(e) => onTemplateValueChange(field.key, e.target.value)}
                         placeholder={field.placeholder || ""}
-                        style={{ padding: 8 }}
+                        className="input"
                       />
                     )}
                   </div>
@@ -650,21 +601,21 @@ export default function CasePage() {
                   type="button"
                   onClick={onGenerateFromTemplate}
                   disabled={busy}
-                  style={{ padding: 10 }}
+                  className="button"
                 >
                   Generate Draft from Template
                 </button>
               </div>
             )}
 
-            <button disabled={busy || !newTitle.trim()} style={{ padding: 10 }}>
+            <button disabled={busy || !newTitle.trim()} className="button button-primary">
               Add Clause
             </button>
           </form>
 
-          <div style={{ display: "grid", gap: 8 }}>
+          <div className="clause-list">
             {clauses.length === 0 ? (
-              <div style={{ color: "#666" }}>No clauses yet.</div>
+              <div className="empty-state">No clauses yet.</div>
             ) : (
               clauses
                 .slice()
@@ -682,23 +633,17 @@ export default function CasePage() {
                     <button
                       key={c._id}
                       onClick={() => setSelectedClauseId(c._id)}
-                      style={{
-                        textAlign: "left",
-                        padding: 10,
-                        border: "1px solid #eee",
-                        background: isSelected ? "#f2f6ff" : "#fff",
-                        cursor: "pointer",
-                      }}
+                      className={`clause-card ${isSelected ? "clause-card-selected" : ""}`}
                     >
-                      <div style={{ fontWeight: 700 }}>{c.title}</div>
-                      <div style={{ fontSize: 12, color: "#666" }}>{c.category}</div>
+                      <div className="clause-card-title">{c.title}</div>
+                      <div className="clause-card-meta">{c.category}</div>
                       {c.templateTitle && (
-                        <div style={{ fontSize: 11, color: "#666", marginTop: 4 }}>
+                        <div className="clause-card-template">
                           Template: <b>{c.templateTitle}</b>
                         </div>
                       )}
                       {s && (
-                        <div style={{ fontSize: 12, marginTop: 6 }}>
+                        <div className="clause-card-status">
                           <span>
                             Party A: {partyARejected ? "❌" : partyAApproved ? "✅" : "—"}
                           </span>
@@ -721,54 +666,37 @@ export default function CasePage() {
           </div>
         </div>
 
-        <div style={{ border: "1px solid #ddd", padding: 12 }}>
-          <h3 style={{ marginTop: 0 }}>Editor</h3>
+        <div className="panel">
+          <h3 className="panel-title">Editor</h3>
 
           {!selectedClause ? (
-            <div style={{ color: "#666" }}>Select a clause to edit.</div>
+            <div className="empty-state">Select a clause to edit.</div>
           ) : (
             <>
-              <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>
+              <div className="editor-meta">
                 Editing: <b>{selectedClause.title}</b>
               </div>
 
               {selectedClause.templateId && (
-                <div
-                  style={{
-                    border: "1px solid #e6e6e6",
-                    background: "#fafafa",
-                    padding: 10,
-                    display: "grid",
-                    gap: 8,
-                    marginBottom: 12,
-                  }}
-                >
-                  <div style={{ fontWeight: 700 }}>Template Source</div>
-                  <div style={{ fontSize: 12 }}>
+                <div className="template-box" style={{ marginBottom: 12 }}>
+                  <div className="template-title">Template Source</div>
+                  <div className="muted">
                     Template: <b>{selectedClause.templateTitle || "Unknown template"}</b>
                   </div>
-                  <div style={{ fontSize: 12 }}>
+                  <div className="muted">
                     Jurisdiction: <b>{selectedClause.templateJurisdiction || "Unknown"}</b>
                   </div>
-                  <div style={{ fontSize: 12 }}>
+                  <div className="muted">
                     Review Status: <b>{selectedClause.templateReviewStatus || "UNKNOWN"}</b>
                   </div>
-                  <div style={{ fontSize: 12 }}>
+                  <div className="muted">
                     Reviewed By: <b>{selectedClause.templateReviewedBy || "Not specified"}</b>
                   </div>
-                  <div style={{ fontSize: 12 }}>
+                  <div className="muted">
                     Reviewed On: <b>{selectedClause.templateReviewedOn || "Not yet reviewed"}</b>
                   </div>
                   {selectedClause.templateDisclaimer && (
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "#7a4d00",
-                        background: "#fff6df",
-                        border: "1px solid #f0d58a",
-                        padding: 8,
-                      }}
-                    >
+                    <div className="template-disclaimer">
                       {selectedClause.templateDisclaimer}
                     </div>
                   )}
@@ -778,43 +706,43 @@ export default function CasePage() {
               <textarea
                 value={draftContent}
                 onChange={(e) => setDraftContent(e.target.value)}
-                style={{ width: "95%", height: 320, padding: 10, fontFamily: "inherit" }}
+                className="textarea textarea-editor"
                 placeholder="Write the clause text here..."
               />
 
-              <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-                <button onClick={onSaveClause} disabled={busy} style={{ padding: "8px 12px" }}>
+              <div className="button-row">
+                <button onClick={onSaveClause} disabled={busy} className="button">
                   Save
                 </button>
-                <button onClick={onApprove} disabled={busy} style={{ padding: "8px 12px" }}>
+                <button onClick={onApprove} disabled={busy} className="button button-primary">
                   Approve
                 </button>
-                <button onClick={openRejectModal} disabled={busy} style={{ padding: "8px 12px" }}>
+                <button onClick={openRejectModal} disabled={busy} className="button">
                   Reject
                 </button>
               </div>
 
-              <div style={{ fontSize: 12, color: "#666", marginTop: 10 }}>
+              <div className="muted" style={{ marginTop: 10 }}>
                 Tip: Rejecting a clause requires a written reason.
               </div>
             </>
           )}
         </div>
 
-        <div style={{ border: "1px solid #ddd", padding: 12 }}>
-          <h3 style={{ marginTop: 0 }}>Comments</h3>
+        <div className="panel">
+          <h3 className="panel-title">Comments</h3>
 
           {!selectedClause ? (
-            <div style={{ color: "#666" }}>Select a clause to view comments.</div>
+            <div className="empty-state">Select a clause to view comments.</div>
           ) : (
             <>
-              <div style={{ maxHeight: 320, overflow: "auto", border: "1px solid #eee", padding: 10 }}>
+              <div className="comment-list">
                 {comments.length === 0 ? (
-                  <div style={{ color: "#666" }}>No comments yet.</div>
+                  <div className="empty-state">No comments yet.</div>
                 ) : (
                   comments.map((c) => (
-                    <div key={c._id} style={{ padding: "8px 0", borderBottom: "1px solid #f2f2f2" }}>
-                      <div style={{ fontSize: 12, color: "#777" }}>
+                    <div key={c._id} className="comment-item">
+                      <div className="comment-user">
                         User:{" "}
                         <code>
                           {typeof c.userId === "object"
@@ -823,7 +751,7 @@ export default function CasePage() {
                         </code>
                       </div>
                       <div>{c.message}</div>
-                      <div style={{ fontSize: 11, color: "#999" }}>
+                      <div className="comment-time">
                         {new Date(c.createdAt).toLocaleString()}
                       </div>
                     </div>
@@ -831,14 +759,14 @@ export default function CasePage() {
                 )}
               </div>
 
-              <form onSubmit={onAddComment} style={{ display: "grid", gap: 8, marginTop: 10 }}>
+              <form onSubmit={onAddComment} className="form-grid" style={{ marginTop: 10 }}>
                 <input
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
                   placeholder="Add a comment..."
-                  style={{ padding: 10 }}
+                  className="input"
                 />
-                <button disabled={busy || !commentText.trim()} style={{ padding: 10 }}>
+                <button disabled={busy || !commentText.trim()} className="button">
                   Add Comment
                 </button>
               </form>
@@ -848,32 +776,10 @@ export default function CasePage() {
       </div>
 
       {rejectModalOpen && (
-        <div
-          onClick={closeRejectModal}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.45)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-            zIndex: 1000,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "100%",
-              maxWidth: 520,
-              background: "#fff",
-              borderRadius: 10,
-              padding: 16,
-              boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
-            }}
-          >
+        <div onClick={closeRejectModal} className="modal-backdrop">
+          <div onClick={(e) => e.stopPropagation()} className="modal-card">
             <h3 style={{ marginTop: 0 }}>Reject Clause</h3>
-            <p style={{ color: "#555" }}>
+            <p className="modal-copy">
               Enter the reason for rejecting this clause.
             </p>
 
@@ -882,22 +788,20 @@ export default function CasePage() {
               onChange={(e) => setRejectReason(e.target.value)}
               rows={5}
               placeholder="Explain what needs to change..."
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                padding: 10,
-                border: "1px solid #ccc",
-                borderRadius: 6,
-                resize: "vertical",
-                marginBottom: 12,
-              }}
+              className="textarea"
+              style={{ marginBottom: 12 }}
             />
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-              <button type="button" onClick={closeRejectModal} disabled={busy}>
+            <div className="modal-actions">
+              <button type="button" onClick={closeRejectModal} disabled={busy} className="button">
                 Cancel
               </button>
-              <button type="button" onClick={onRejectConfirm} disabled={busy}>
+              <button
+                type="button"
+                onClick={onRejectConfirm}
+                disabled={busy}
+                className="button button-primary"
+              >
                 {busy ? "Submitting..." : "Submit Rejection"}
               </button>
             </div>
