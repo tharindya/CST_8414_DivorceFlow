@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
+import "../styles/dashboard.css";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -88,42 +89,42 @@ export default function Dashboard() {
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: "24px auto", padding: 16 }}>
-      <h2 style={{ marginBottom: 12 }}>Dashboard</h2>
+    <div className="dashboard-page">
+      <h2 className="dashboard-title">Dashboard</h2>
 
       {error && (
-        <div style={{ background: "#fee", border: "1px solid #f99", padding: 10, marginBottom: 12 }}>
+        <div className="dashboard-alert dashboard-alert-error">
           {error}
         </div>
       )}
 
       {message && (
-        <div style={{ background: "#eef9ee", border: "1px solid #7ac77a", padding: 10, marginBottom: 12 }}>
+        <div className="dashboard-alert dashboard-alert-success">
           {message}
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <div style={{ border: "1px solid #ddd", padding: 12 }}>
-          <h3 style={{ marginTop: 0 }}>Create a new agreement</h3>
-          <form onSubmit={onCreateCase} style={{ display: "grid", gap: 10 }}>
+      <div className="dashboard-grid">
+        <div className="dashboard-card">
+          <h3 className="dashboard-card-title">Create a new agreement</h3>
+          <form onSubmit={onCreateCase} className="dashboard-form">
             <input
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
-              style={{ padding: 10 }}
+              className="dashboard-input"
               placeholder="Agreement title"
             />
             <input
               type="email"
               value={partyBEmail}
               onChange={(e) => setPartyBEmail(e.target.value)}
-              style={{ padding: 10 }}
+              className="dashboard-input"
               placeholder="Other party email"
             />
             <select
               value={jurisdiction}
               onChange={(e) => setJurisdiction(e.target.value)}
-              style={{ padding: 10 }}
+              className="dashboard-select"
             >
               <option value="General">General</option>
               <option value="Ontario">Ontario</option>
@@ -131,81 +132,86 @@ export default function Dashboard() {
               <option value="British Columbia">British Columbia</option>
               <option value="Alberta">Alberta</option>
             </select>
-            <button disabled={creating} style={{ padding: 10 }}>
+            <button
+              disabled={creating}
+              className="dashboard-button dashboard-button-primary"
+            >
               {creating ? "Creating..." : "Create Case and Send Invite"}
             </button>
           </form>
         </div>
 
-        <div style={{ border: "1px solid #ddd", padding: 12 }}>
-          <h3 style={{ marginTop: 0 }}>Join an agreement</h3>
-          <form onSubmit={onJoinCase} style={{ display: "grid", gap: 10 }}>
+        <div className="dashboard-card">
+          <h3 className="dashboard-card-title">Join an agreement</h3>
+          <form onSubmit={onJoinCase} className="dashboard-form">
             <input
               value={joinCaseId}
               onChange={(e) => setJoinCaseId(e.target.value)}
-              style={{ padding: 10 }}
+              className="dashboard-input"
               placeholder="Case ID"
             />
             <input
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value)}
-              style={{ padding: 10 }}
+              className="dashboard-input"
               placeholder="Invite Code"
             />
-            <button disabled={joining} style={{ padding: 10 }}>
+            <button
+              disabled={joining}
+              className="dashboard-button"
+            >
               {joining ? "Joining..." : "Join Case"}
             </button>
           </form>
         </div>
       </div>
 
-      <div style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 10 }}>
-        <h3 style={{ margin: 0 }}>My agreements</h3>
-        <button onClick={loadCases} disabled={loading} style={{ padding: "6px 10px" }}>
+      <div className="dashboard-section-header">
+        <h3 className="dashboard-section-title">My agreements</h3>
+        <button
+          onClick={loadCases}
+          disabled={loading}
+          className="dashboard-button"
+        >
           Refresh
         </button>
       </div>
 
       {loading ? (
-        <div style={{ padding: 12 }}>Loading...</div>
+        <div className="dashboard-loading">Loading...</div>
       ) : cases.length === 0 ? (
-        <div style={{ padding: 12, color: "#555" }}>No cases yet.</div>
+        <div className="dashboard-empty">No cases yet.</div>
       ) : (
-        <div style={{ marginTop: 10, border: "1px solid #ddd" }}>
+        <div className="dashboard-list">
           {cases.map((c) => (
-            <div
-              key={c._id}
-              style={{
-                padding: 12,
-                borderTop: "1px solid #eee",
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 12,
-                alignItems: "center",
-              }}
-            >
+            <div key={c._id} className="dashboard-list-item">
               <div>
-                <div style={{ fontWeight: 700 }}>{c.title}</div>
-                <div style={{ fontSize: 13, color: "#555" }}>
+                <div className="dashboard-case-title">{c.title}</div>
+                <div className="dashboard-case-meta">
                   Status: <b>{c.status}</b>
                 </div>
-                <div style={{ fontSize: 12, color: "#777" }}>
+                <div className="dashboard-case-submeta">
                   Jurisdiction: <b>{c.jurisdiction || "General"}</b>
                 </div>
-                <div style={{ fontSize: 12, color: "#777" }}>
+                <div className="dashboard-case-submeta">
                   Case ID: <code>{c._id}</code>
                 </div>
-                <div style={{ fontSize: 12, color: "#777" }}>
+                <div className="dashboard-case-submeta">
                   Party B Email: <code>{c.partyBEmail || "not set"}</code>
                 </div>
-                <div style={{ fontSize: 12, color: "#777" }}>
+                <div className="dashboard-case-submeta">
                   Invitation: <b>{c.invitationStatus || "PENDING"}</b>
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: 10 }}>
-                <Link to={`/cases/${c._id}`}>Open</Link>
-                <button onClick={() => onResendInvite(c._id)} style={{ padding: "6px 10px" }}>
+              <div className="dashboard-actions">
+                <Link to={`/cases/${c._id}`} className="dashboard-link">
+                  Open
+                </Link>
+                <button
+                  onClick={() => onResendInvite(c._id)}
+                  className="dashboard-button"
+                >
                   Send Invite
                 </button>
               </div>
