@@ -1,0 +1,145 @@
+.app-navbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.app-navbar__inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.app-navbar__brand {
+  text-decoration: none;
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #5b21b6;
+}
+
+.app-navbar__brand:hover {
+  color: #4c1d95;
+}
+
+.app-navbar__right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-navbar__user-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #fafafa;
+}
+
+.app-navbar__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ede9fe;
+  color: #5b21b6;
+  font-weight: 700;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.app-navbar__user-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-navbar__user-label {
+  font-size: 0.72rem;
+  color: #6b7280;
+  line-height: 1.1;
+}
+
+.app-navbar__user-email {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.app-navbar__logout {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #111827;
+  border-radius: 10px;
+  padding: 9px 14px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.app-navbar__logout:hover {
+  background: #f9fafb;
+}
+
+.app-navbar__guest-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-navbar__link {
+  text-decoration: none;
+  color: #374151;
+  font-weight: 600;
+}
+
+.app-navbar__link:hover {
+  color: #111827;
+}
+
+.app-navbar__link--primary {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #111827;
+  color: #ffffff;
+}
+
+.app-navbar__link--primary:hover {
+  background: #1f2937;
+  color: #ffffff;
+}
+
+@media (max-width: 700px) {
+  .app-navbar__inner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .app-navbar__right {
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .app-navbar__user-pill {
+    flex: 1 1 auto;
+    min-width: 0;
+    border-radius: 16px;
+  }
+
+  .app-navbar__user-email {
+    white-space: normal;
+    word-break: break-word;
+  }
+}

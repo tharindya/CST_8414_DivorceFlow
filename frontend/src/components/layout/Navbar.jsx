@@ -1,37 +1,58 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import "./navbar.css";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  return (
-    <div style={{ padding: 12, borderBottom: "1px solid #ddd", display: "flex", gap: 12 }}>
-      <Link to="/" style={{ fontWeight: 700, textDecoration: "none" }}>
-        DivorceFlow
-      </Link>
+  const displayEmail = user?.email || "";
+  const initial = displayEmail ? displayEmail.charAt(0).toUpperCase() : "U";
 
-      <div style={{ marginLeft: "auto", display: "flex", gap: 12, alignItems: "center" }}>
-        {user ? (
-          <>
-            <span style={{ fontSize: 14 }}>{user.email}</span>
-            <button
-              onClick={() => {
-                logout();
-                navigate("/login");
-              }}
-            >
-              Logout
-            </button>
-          </>
-        ) : (
-          <>
-            <Link to="/login">Login</Link>
-            <Link to="/register">Register</Link>
-          </>
-        )}
+  function handleLogout() {
+    logout();
+    navigate("/login");
+  }
+
+  return (
+    <header className="app-navbar">
+      <div className="app-navbar__inner">
+        <Link to="/" className="app-navbar__brand">
+          DivorceFlow
+        </Link>
+
+        <div className="app-navbar__right">
+          {user ? (
+            <>
+              <div className="app-navbar__user-pill">
+                <div className="app-navbar__avatar">{initial}</div>
+                <div className="app-navbar__user-meta">
+                  <div className="app-navbar__user-label">Signed in</div>
+                  <div className="app-navbar__user-email">{displayEmail}</div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="app-navbar__logout"
+              >
+                Log out
+              </button>
+            </>
+          ) : (
+            <div className="app-navbar__guest-links">
+              <Link to="/login" className="app-navbar__link">
+                Login
+              </Link>
+              <Link to="/register" className="app-navbar__link app-navbar__link--primary">
+                Register
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </header>
   );
 }
