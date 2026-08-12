@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import "../styles/auth.css";
 
 export default function Register() {
   const { register } = useAuth();
@@ -16,6 +17,7 @@ export default function Register() {
     e.preventDefault();
     setError("");
     setBusy(true);
+
     try {
       await register(name, email, password);
       navigate("/dashboard");
@@ -27,57 +29,59 @@ export default function Register() {
   }
 
   return (
-    <div style={{ maxWidth: 420, margin: "24px auto", padding: 16 }}>
-      <h2 style={{ marginBottom: 12 }}>Register</h2>
+    <div className="auth-shell">
+      <div className="auth-card">
+        <div className="auth-eyebrow">Start a new agreement</div>
+        <h1 className="auth-title">Create your DivorceFlow account</h1>
+        <p className="auth-subtitle">
+          Set up your secure access to create, review, and negotiate agreement clauses.
+        </p>
 
-      {error && (
-        <div style={{ background: "#fee", border: "1px solid #f99", padding: 10, marginBottom: 12 }}>
-          {error}
+        {error && <div className="auth-alert auth-alert--error">{error}</div>}
+
+        <form onSubmit={onSubmit} className="auth-form">
+          <label className="auth-field">
+            <span className="auth-label">Full name</span>
+            <input
+              className="auth-input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your name"
+              autoComplete="name"
+            />
+          </label>
+
+          <label className="auth-field">
+            <span className="auth-label">Email</span>
+            <input
+              className="auth-input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              autoComplete="email"
+            />
+          </label>
+
+          <label className="auth-field">
+            <span className="auth-label">Password</span>
+            <input
+              className="auth-input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              placeholder="Minimum 8 characters"
+              autoComplete="new-password"
+            />
+          </label>
+
+          <button type="submit" disabled={busy} className="auth-button">
+            {busy ? "Creating account..." : "Create account"}
+          </button>
+        </form>
+
+        <div className="auth-footer">
+          Already registered? <Link to="/login">Sign in</Link>
         </div>
-      )}
-
-      <form onSubmit={onSubmit} style={{ display: "grid", gap: 10 }}>
-        <label>
-          <div style={{ fontSize: 14, marginBottom: 4 }}>Name</div>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            style={{ width: "100%", padding: 10 }}
-            placeholder="Your name"
-            autoComplete="name"
-          />
-        </label>
-
-        <label>
-          <div style={{ fontSize: 14, marginBottom: 4 }}>Email</div>
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={{ width: "100%", padding: 10 }}
-            placeholder="you@example.com"
-            autoComplete="email"
-          />
-        </label>
-
-        <label>
-          <div style={{ fontSize: 14, marginBottom: 4 }}>Password</div>
-          <input
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{ width: "100%", padding: 10 }}
-            type="password"
-            placeholder="min 8 chars"
-            autoComplete="new-password"
-          />
-        </label>
-
-        <button disabled={busy} style={{ padding: 10 }}>
-          {busy ? "Creating..." : "Create account"}
-        </button>
-      </form>
-
-      <div style={{ marginTop: 12, fontSize: 14 }}>
-        Already have an account? <Link to="/login">Login</Link>
       </div>
     </div>
   );

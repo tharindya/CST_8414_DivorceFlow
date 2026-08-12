@@ -143,3 +143,25 @@
     word-break: break-word;
   }
 }
+
+.app-navbar__nav-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-navbar__link--admin {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #f3e8ff;
+  color: #5b21b6;
+}
+
+.app-navbar__link--admin:hover {
+  background: #ede9fe;
+  color: #4c1d95;
+}
+
+.app-navbar__nav-links {
+  flex-wrap: wrap;
+}

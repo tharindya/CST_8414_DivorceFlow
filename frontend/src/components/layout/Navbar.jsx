@@ -25,10 +25,32 @@ export default function Navbar() {
         <div className="app-navbar__right">
           {user ? (
             <>
+              <div className="app-navbar__nav-links">
+                <Link to="/dashboard" className="app-navbar__link">
+                  Dashboard
+                </Link>
+
+                {user.role === "ADMIN" && (
+                  <>
+                    <Link to="/admin" className="app-navbar__link app-navbar__link--admin">
+                      Admin Cases
+                    </Link>
+                    <Link
+                      to="/admin/templates"
+                      className="app-navbar__link app-navbar__link--admin"
+                    >
+                      Templates
+                    </Link>
+                  </>
+                )}
+              </div>
+
               <div className="app-navbar__user-pill">
                 <div className="app-navbar__avatar">{initial}</div>
                 <div className="app-navbar__user-meta">
-                  <div className="app-navbar__user-label">Signed in</div>
+                  <div className="app-navbar__user-label">
+                    {user.role === "ADMIN" ? "Legal moderator" : "Signed in"}
+                  </div>
                   <div className="app-navbar__user-email">{displayEmail}</div>
                 </div>
               </div>
