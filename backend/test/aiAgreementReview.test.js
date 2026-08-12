@@ -39,7 +39,12 @@ test("requestAgreementReview requests structured JSON from Gemini", async () => 
     return {
       ok: true,
       status: 200,
-      json: async () => ({ output_text: JSON.stringify(modelReview) }),
+      json: async () => ({
+        steps: [{
+          type: "model_output",
+          content: [{ type: "text", text: JSON.stringify(modelReview) }],
+        }],
+      }),
     };
   };
 
@@ -51,6 +56,8 @@ test("requestAgreementReview requests structured JSON from Gemini", async () => 
 
   assert.equal(captured.url, "https://generativelanguage.googleapis.com/v1beta/interactions");
   assert.equal(captured.options.headers["x-goog-api-key"], "test-key");
+  assert.equal(captured.options.headers["Api-Revision"], "2026-05-20");
+  assert.equal(captured.body.store, false);
   assert.equal(captured.body.response_format.mime_type, "application/json");
   assert.deepEqual(captured.body.response_format.schema.required, [
     "summary",

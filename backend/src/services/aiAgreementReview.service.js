@@ -41,6 +41,17 @@ const REVIEW_SCHEMA = {
 function extractOutputText(responseBody) {
   if (responseBody?.output_text) return String(responseBody.output_text).trim();
 
+  for (const step of responseBody?.steps || []) {
+    if (step?.type !== "model_output") continue;
+    for (const content of step.content || []) {
+      if (content?.type === "text" && content.text) return content.text.trim();
+    }
+  }
+
+  for (const output of responseBody?.outputs || []) {
+    if (output?.type === "text" && output.text) return output.text.trim();
+  }
+
   for (const output of responseBody?.output || []) {
     for (const content of output?.content || []) {
       if (content?.type === "refusal") {
@@ -102,10 +113,12 @@ async function requestAgreementReview({ caseDoc, clauses, fetchImpl = fetch }) {
       method: "POST",
       headers: {
         "x-goog-api-key": apiKey,
+        "Api-Revision": "2026-05-20",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model,
+        store: false,
         input: [
           "Review the supplied divorce agreement draft as a drafting assistant, not as a lawyer.",
           "Compare the intake with every clause and identify missing topics, internal conflicts, ambiguous wording, incomplete amounts or dates, and terms that require human attention.",

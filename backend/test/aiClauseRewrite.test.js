@@ -5,9 +5,11 @@ const {
   requestClauseRewrite,
 } = require("../src/services/aiClauseRewrite.service");
 
-test("extractOutputText reads a Gemini output_text field", () => {
+test("extractOutputText reads the current Gemini REST steps response", () => {
   assert.equal(
-    extractOutputText({ output_text: "Rewritten clause" }),
+    extractOutputText({
+      steps: [{ type: "model_output", content: [{ type: "text", text: "Rewritten clause" }] }],
+    }),
     "Rewritten clause"
   );
 });
@@ -21,7 +23,12 @@ test("requestClauseRewrite sends the clause to the Gemini Interactions API", asy
     return {
       ok: true,
       status: 200,
-      json: async () => ({ output_text: "Party A shall pay monthly." }),
+      json: async () => ({
+        steps: [{
+          type: "model_output",
+          content: [{ type: "text", text: "Party A shall pay monthly." }],
+        }],
+      }),
     };
   };
 
@@ -33,7 +40,9 @@ test("requestClauseRewrite sends the clause to the Gemini Interactions API", asy
 
   assert.equal(captured.url, "https://generativelanguage.googleapis.com/v1beta/interactions");
   assert.equal(captured.options.headers["x-goog-api-key"], "test-key");
+  assert.equal(captured.options.headers["Api-Revision"], "2026-05-20");
   assert.equal(captured.body.model, "test-model");
+  assert.equal(captured.body.store, false);
   assert.match(captured.body.input, /Party A will make payment every month/);
   assert.equal(captured.body.generation_config.thinking_level, "low");
   assert.equal(result.rewrittenContent, "Party A shall pay monthly.");

@@ -3,6 +3,17 @@ const MODES = ["CLEAR", "CONCISE", "FORMAL"];
 function extractOutputText(responseBody) {
   if (responseBody?.output_text) return String(responseBody.output_text).trim();
 
+  for (const step of responseBody?.steps || []) {
+    if (step?.type !== "model_output") continue;
+    for (const content of step.content || []) {
+      if (content?.type === "text" && content.text) return content.text.trim();
+    }
+  }
+
+  for (const output of responseBody?.outputs || []) {
+    if (output?.type === "text" && output.text) return output.text.trim();
+  }
+
   for (const output of responseBody?.output || []) {
     for (const content of output?.content || []) {
       if (content?.type === "output_text" && content.text) return content.text.trim();
@@ -47,10 +58,12 @@ async function requestClauseRewrite({ content, mode = "CLEAR", fetchImpl = fetch
       method: "POST",
       headers: {
         "x-goog-api-key": apiKey,
+        "Api-Revision": "2026-05-20",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model,
+        store: false,
         input: [
           "You rewrite one clause from a divorce agreement.",
           "Preserve names, amounts, dates, responsibilities, exceptions, and legal meaning.",
