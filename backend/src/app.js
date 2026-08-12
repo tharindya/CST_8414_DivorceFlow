@@ -6,6 +6,7 @@ const templateRoutes = require("./routes/template.routes");
 const exportRoutes = require("./routes/export.routes");
 const mockReviewRoutes = require("./routes/mockReview.routes");
 const aiAgreementReviewRoutes = require("./routes/aiAgreementReview.routes");
+const finalReviewRoutes = require("./routes/finalReview.routes");
 const adminRoutes = require("./routes/admin.routes");
 const { errorHandler } = require("./middleware/error");
 const messageRoutes = require("./routes/message.routes");
@@ -34,6 +35,7 @@ app.use("/", exportRoutes);
 app.use("/", templateRoutes);
 app.use("/", mockReviewRoutes);
 app.use("/", aiAgreementReviewRoutes);
+app.use("/", finalReviewRoutes);
 app.use("/", messageRoutes);
 
 app.use("/admin", adminRoutes);
