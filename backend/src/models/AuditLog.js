@@ -19,6 +19,7 @@ const auditLogSchema = new mongoose.Schema(
         "CLAUSE_REJECTED",
         "COMMENT_ADDED",
         "MESSAGE_SENT",
+        "AI_AGREEMENT_REVIEW",
       ],
     },
 

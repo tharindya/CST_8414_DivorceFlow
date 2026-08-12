@@ -2,8 +2,28 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   buildReviewInput,
+  extractOutputText,
+  parseReviewOutput,
   requestAgreementReview,
 } = require("../src/services/aiAgreementReview.service");
+
+test("extractOutputText joins multiple Gemini model output blocks", () => {
+  const text = extractOutputText({
+    steps: [
+      { type: "model_output", content: [{ type: "text", text: '{"summary":"Draft' }] },
+      { type: "model_output", content: [{ type: "text", text: ' review"}' }] },
+    ],
+  });
+
+  assert.equal(text, '{"summary":"Draft review"}');
+});
+
+test("parseReviewOutput accepts JSON wrapped in a Markdown fence", () => {
+  assert.deepEqual(
+    parseReviewOutput('```json\n{"summary":"Draft review"}\n```'),
+    { summary: "Draft review" }
+  );
+});
 
 test("buildReviewInput includes intake and all supplied clauses", () => {
   const result = JSON.parse(buildReviewInput({

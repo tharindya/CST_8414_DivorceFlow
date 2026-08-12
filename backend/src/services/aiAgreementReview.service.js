@@ -10,6 +10,7 @@ const REVIEW_SCHEMA = {
     },
     issues: {
       type: "array",
+      maxItems: 12,
       items: {
         type: "object",
         additionalProperties: false,
@@ -24,6 +25,7 @@ const REVIEW_SCHEMA = {
     },
     recommendations: {
       type: "array",
+      maxItems: 12,
       items: {
         type: "object",
         additionalProperties: false,
@@ -41,16 +43,20 @@ const REVIEW_SCHEMA = {
 function extractOutputText(responseBody) {
   if (responseBody?.output_text) return String(responseBody.output_text).trim();
 
+  const stepText = [];
   for (const step of responseBody?.steps || []) {
     if (step?.type !== "model_output") continue;
     for (const content of step.content || []) {
-      if (content?.type === "text" && content.text) return content.text.trim();
+      if (content?.type === "text" && content.text) stepText.push(String(content.text));
     }
   }
+  if (stepText.length) return stepText.join("").trim();
 
+  const legacyText = [];
   for (const output of responseBody?.outputs || []) {
-    if (output?.type === "text" && output.text) return output.text.trim();
+    if (output?.type === "text" && output.text) legacyText.push(String(output.text));
   }
+  if (legacyText.length) return legacyText.join("").trim();
 
   for (const output of responseBody?.output || []) {
     for (const content of output?.content || []) {
@@ -63,6 +69,25 @@ function extractOutputText(responseBody) {
     }
   }
   return "";
+}
+
+function parseReviewOutput(outputText) {
+  const source = String(outputText || "").trim();
+  if (!source) throw new SyntaxError("Empty JSON output");
+
+  const withoutFence = source
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  try {
+    return JSON.parse(withoutFence);
+  } catch {
+    const firstBrace = withoutFence.indexOf("{");
+    const lastBrace = withoutFence.lastIndexOf("}");
+    if (firstBrace === -1 || lastBrace <= firstBrace) throw new SyntaxError("No JSON object found");
+    return JSON.parse(withoutFence.slice(firstBrace, lastBrace + 1));
+  }
 }
 
 function buildReviewInput({ caseDoc, clauses }) {
@@ -129,7 +154,7 @@ async function requestAgreementReview({ caseDoc, clauses, fetchImpl = fetch }) {
         ].join("\n\n"),
         generation_config: {
           thinking_level: "medium",
-          max_output_tokens: 1800,
+          max_output_tokens: 4096,
         },
         response_format: {
           type: "text",
@@ -155,7 +180,7 @@ async function requestAgreementReview({ caseDoc, clauses, fetchImpl = fetch }) {
 
     let review;
     try {
-      review = JSON.parse(outputText);
+      review = parseReviewOutput(outputText);
     } catch {
       const error = new Error("Gemini returned an invalid agreement review");
       error.statusCode = 502;
@@ -178,6 +203,7 @@ async function requestAgreementReview({ caseDoc, clauses, fetchImpl = fetch }) {
 module.exports = {
   REVIEW_SCHEMA,
   extractOutputText,
+  parseReviewOutput,
   buildReviewInput,
   requestAgreementReview,
 };

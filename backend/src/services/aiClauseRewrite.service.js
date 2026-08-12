@@ -3,16 +3,20 @@ const MODES = ["CLEAR", "CONCISE", "FORMAL"];
 function extractOutputText(responseBody) {
   if (responseBody?.output_text) return String(responseBody.output_text).trim();
 
+  const stepText = [];
   for (const step of responseBody?.steps || []) {
     if (step?.type !== "model_output") continue;
     for (const content of step.content || []) {
-      if (content?.type === "text" && content.text) return content.text.trim();
+      if (content?.type === "text" && content.text) stepText.push(String(content.text));
     }
   }
+  if (stepText.length) return stepText.join("").trim();
 
+  const legacyText = [];
   for (const output of responseBody?.outputs || []) {
-    if (output?.type === "text" && output.text) return output.text.trim();
+    if (output?.type === "text" && output.text) legacyText.push(String(output.text));
   }
+  if (legacyText.length) return legacyText.join("").trim();
 
   for (const output of responseBody?.output || []) {
     for (const content of output?.content || []) {
