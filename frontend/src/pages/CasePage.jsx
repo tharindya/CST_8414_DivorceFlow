@@ -168,6 +168,9 @@ export default function CasePage() {
   const [newCategory, setNewCategory] = useState("General");
 
   const [draftContent, setDraftContent] = useState("");
+  const [rewriteMode, setRewriteMode] = useState("CLEAR");
+  const [rewritePreview, setRewritePreview] = useState(null);
+  const [rewriteBusy, setRewriteBusy] = useState(false);
   const [commentText, setCommentText] = useState("");
 
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
@@ -492,6 +495,7 @@ export default function CasePage() {
 
       const updated = data.clause;
       setClauses((prev) => prev.map((c) => (c._id === updated._id ? updated : c)));
+      setRewritePreview(null);
 
       const statusRes = await api.getClauseStatus(caseId);
       const nextCase = { ...(caseDoc || {}), status: statusRes.caseStatus };
@@ -508,6 +512,26 @@ export default function CasePage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function onPreviewRewrite() {
+    if (!selectedClause) return;
+    try {
+      setError("");
+      setRewriteBusy(true);
+      const data = await api.previewClauseRewrite(selectedClause._id, rewriteMode, draftContent);
+      setRewritePreview(data);
+    } catch (err) {
+      setError(err.message || "Failed to generate clause rewrite");
+    } finally {
+      setRewriteBusy(false);
+    }
+  }
+
+  function onUseRewrite() {
+    if (!rewritePreview?.rewrittenContent) return;
+    setDraftContent(rewritePreview.rewrittenContent);
+    setRewritePreview(null);
   }
 
   async function onAddComment(e) {
@@ -743,6 +767,41 @@ export default function CasePage() {
                 rows={3}
                 className="case-textarea"
               />
+
+              <section className="case-rewrite-box" aria-labelledby="rewrite-heading">
+                <div>
+                  <h3 id="rewrite-heading" className="case-section-small-title">AI clause rewrite</h3>
+                  <p className="case-panel-subtitle">
+                    Generate a drafting preview without changing the saved clause.
+                  </p>
+                </div>
+                <div className="case-rewrite-controls">
+                  <label className="case-field">
+                    <span className="case-label">Rewrite style</span>
+                    <select className="case-select" value={rewriteMode}
+                      onChange={(e) => { setRewriteMode(e.target.value); setRewritePreview(null); }}>
+                      <option value="CLEAR">Clearer language</option>
+                      <option value="CONCISE">More concise</option>
+                      <option value="FORMAL">More formal</option>
+                    </select>
+                  </label>
+                  <button type="button" className="case-button case-button-secondary"
+                    onClick={onPreviewRewrite} disabled={rewriteBusy || busy || !draftContent.trim()}>
+                    {rewriteBusy ? "Generating..." : "Generate rewrite"}
+                  </button>
+                </div>
+                {rewritePreview && (
+                  <div className="case-rewrite-preview" aria-live="polite">
+                    <div className="case-review-label">Suggested rewrite</div>
+                    <p>{rewritePreview.rewrittenContent}</p>
+                    <div className="case-help-note">{rewritePreview.disclaimer}</div>
+                    <div className="case-editor-actions">
+                      <button type="button" className="case-button case-button-primary" onClick={onUseRewrite}>Use this draft</button>
+                      <button type="button" className="case-button case-button-secondary" onClick={() => setRewritePreview(null)}>Discard</button>
+                    </div>
+                  </div>
+                )}
+              </section>
             </label>
           ))}
 

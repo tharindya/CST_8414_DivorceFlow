@@ -130,6 +130,12 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  previewClauseRewrite: (clauseId, mode, content) =>
+    request(`/clauses/${clauseId}/rewrite`, {
+      method: "POST",
+      body: JSON.stringify({ mode, content }),
+    }),
+
   listClauseVersions: (clauseId) => request(`/clauses/${clauseId}/versions`),
 
   listCaseAudit: (caseId) => request(`/cases/${caseId}/audit`),
