@@ -141,6 +141,8 @@ export default function CasePage() {
   const [exportCheck, setExportCheck] = useState(null);
   const [mockReview, setMockReview] = useState(null);
   const [reviewBusy, setReviewBusy] = useState(false);
+  const [aiReview, setAiReview] = useState(null);
+  const [aiReviewBusy, setAiReviewBusy] = useState(false);
   const [intakeDraft, setIntakeDraft] = useState(EMPTY_INTAKE);
   const [intakeSaving, setIntakeSaving] = useState(false);
   const [intakeMessage, setIntakeMessage] = useState("");
@@ -178,6 +180,10 @@ export default function CasePage() {
 
   const [clauseVersions, setClauseVersions] = useState([]);
   const [auditEvents, setAuditEvents] = useState([]);
+
+  useEffect(() => {
+    setAiReview(null);
+  }, [clauses, caseDoc?.status, caseDoc?.intake?.completedAt]);
 
   async function loadExportCheck(currentCaseDoc) {
     if (!currentCaseDoc || currentCaseDoc.status !== "READY") {
@@ -232,6 +238,20 @@ export default function CasePage() {
       setError(err.message || "Failed to run mock review");
     } finally {
       setReviewBusy(false);
+    }
+  }
+
+  async function onRunAiReview() {
+    try {
+      setError("");
+      setAiReviewBusy(true);
+      const data = await api.getAiAgreementReview(caseId);
+      setAiReview(data);
+      await loadAuditTrail();
+    } catch (err) {
+      setError(err.message || "Failed to run AI agreement review");
+    } finally {
+      setAiReviewBusy(false);
     }
   }
 
@@ -708,10 +728,26 @@ export default function CasePage() {
         </div>
 
         <div className="case-hero-actions">
+          <Link
+            to={`/cases/${caseId}/final-review`}
+            className="case-button case-button-secondary"
+          >
+            Open final review
+          </Link>
+
+          <button
+            type="button"
+            onClick={onRunAiReview}
+            disabled={aiReviewBusy || reviewBusy || busy || clauses.length === 0}
+            className="case-button case-button-primary"
+          >
+            {aiReviewBusy ? "Analyzing agreement..." : "Run AI agreement review"}
+          </button>
+
           <button
             type="button"
             onClick={onRunMockReview}
-            disabled={reviewBusy || busy}
+            disabled={reviewBusy || aiReviewBusy || busy}
             className="case-button case-button-secondary"
           >
             {reviewBusy ? "Running review..." : "Run mock review"}
@@ -865,6 +901,74 @@ export default function CasePage() {
             )}
           </div>
         )}
+
+        <div className="case-review-card case-review-card-ai">
+          <div className="case-review-header">
+            <h2 className="case-review-title">AI agreement review</h2>
+            {aiReview?.readiness && (
+              <span className={`case-ai-readiness case-ai-readiness--${aiReview.readiness.toLowerCase()}`}>
+                {aiReview.readiness.replaceAll("_", " ")}
+              </span>
+            )}
+          </div>
+
+          {!aiReview ? (
+            <p className="case-review-copy">
+              Analyze the guided intake and all current clauses for drafting gaps,
+              conflicts, ambiguity, and incomplete details.
+            </p>
+          ) : (
+            <div className="case-review-stack">
+              <div className="case-summary-box">
+                <span className="case-review-label">AI summary</span>
+                <div>{aiReview.summary}</div>
+              </div>
+
+              <p className="case-review-copy">{aiReview.disclaimer}</p>
+
+              <div className="case-review-block">
+                <div className="case-review-label">Issues</div>
+                {aiReview.issues?.length ? (
+                  <div className="case-issue-list">
+                    {aiReview.issues.map((issue, index) => (
+                      <div key={`${issue.category}-${index}`} className="case-issue-card">
+                        <div className="case-issue-title">
+                          {issue.category}
+                          <span className="case-issue-severity">{issue.severity}</span>
+                        </div>
+                        {issue.clauseTitle && (
+                          <div className="case-ai-clause-name">Clause: {issue.clauseTitle}</div>
+                        )}
+                        <div className="case-issue-message">{issue.message}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="case-review-ok">No obvious drafting issues returned.</div>
+                )}
+              </div>
+
+              <div className="case-review-block">
+                <div className="case-review-label">Recommendations</div>
+                {aiReview.recommendations?.length ? (
+                  <div className="case-issue-list">
+                    {aiReview.recommendations.map((recommendation, index) => (
+                      <div key={`${recommendation.action}-${index}`} className="case-issue-card">
+                        <div className="case-issue-title">
+                          {recommendation.action}
+                          <span className="case-issue-severity">{recommendation.priority}</span>
+                        </div>
+                        <div className="case-issue-message">{recommendation.reason}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="case-muted">No recommendations returned.</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="case-review-card case-review-card-neutral">
           <div className="case-review-header">

@@ -6,6 +6,7 @@ import Login from "../pages/Login";
 import Register from "../pages/Register";
 import Dashboard from "../pages/Dashboard";
 import CasePage from "../pages/CasePage";
+import FinalReviewPage from "../pages/FinalReviewPage";
 import InvitePage from "../pages/InvitePage";
 import AdminDashboard from "../pages/AdminDashboard";
 import AdminCaseReview from "../pages/AdminCaseReview";
@@ -33,6 +34,15 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <CasePage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/cases/:caseId/final-review"
+        element={
+          <ProtectedRoute>
+            <FinalReviewPage />
           </ProtectedRoute>
         }
       />

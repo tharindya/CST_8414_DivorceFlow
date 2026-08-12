@@ -94,6 +94,8 @@ export const api = {
 
   getCase: (caseId) => request(`/cases/${caseId}`),
 
+  getFinalReview: (caseId) => request(`/cases/${caseId}/final-review`),
+
   updateCaseIntake: (caseId, payload) =>
     request(`/cases/${caseId}/intake`, {
       method: "PUT",
@@ -167,6 +169,10 @@ export const api = {
 
   // mock review
   getMockReview: (caseId) => request(`/cases/${caseId}/mock-review`),
+
+  // AI agreement review
+  getAiAgreementReview: (caseId) =>
+    request(`/cases/${caseId}/ai-review`, { method: "POST" }),
 
   downloadCasePdf: async (caseId) => {
     const token = getToken();
