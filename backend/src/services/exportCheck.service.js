@@ -78,6 +78,17 @@ function classifyClause(clause) {
   };
 }
 
+function textMeansNone(text) {
+  const normalized = normalizeText(text);
+
+  return (
+    !normalized ||
+    ["none", "n/a", "na", "not applicable", "no", "no dependents", "no children"].includes(
+      normalized
+    )
+  );
+}
+
 function buildExportCheck(caseDoc, clauses) {
   const detected = {
     hasProperty: false,
@@ -102,6 +113,17 @@ function buildExportCheck(caseDoc, clauses) {
   const missingCategories = [];
   const warnings = [];
 
+  const intake = caseDoc?.intake || {};
+
+  if (!intake.completed) {
+    missingCategories.push("Guided Intake");
+    warnings.push("Guided case intake is incomplete.");
+  }
+
+  const intakeMentionsDependents = !textMeansNone(intake.dependents);
+  const intakeMentionsSupport = !textMeansNone(intake.supportRequirements);
+  const intakeMentionsCustody = !textMeansNone(intake.custodyPreferences);
+
   if (!detected.hasProperty) {
     missingCategories.push("Property");
     warnings.push("No property-related clause was found.");
@@ -112,10 +134,13 @@ function buildExportCheck(caseDoc, clauses) {
     warnings.push("No debt-related clause was found.");
   }
 
-  if (detected.hasChildContext && !detected.hasCustody) {
+  if (
+    (detected.hasChildContext || intakeMentionsDependents || intakeMentionsCustody) &&
+    !detected.hasCustody
+  ) {
     missingCategories.push("Custody");
     warnings.push(
-      "Child-related drafting was detected, but no custody or parenting clause was found."
+      "Child or custody-related intake/drafting was detected, but no custody or parenting clause was found."
     );
   }
 

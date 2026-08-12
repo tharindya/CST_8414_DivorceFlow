@@ -1,5 +1,6 @@
 const Comment = require("../models/Comment");
 const Clause = require("../models/Clause");
+const { recordAuditLog } = require("../services/audit.service");
 
 async function listComments(req, res, next) {
   try {
@@ -25,7 +26,7 @@ async function addComment(req, res, next) {
       return res.status(400).json({ error: "message is required" });
     }
 
-    const clause = await Clause.findById(clauseId).select("caseId");
+    const clause = await Clause.findById(clauseId).select("caseId title");
     if (!clause) return res.status(404).json({ error: "Clause not found" });
 
     const comment = await Comment.create({
@@ -33,6 +34,16 @@ async function addComment(req, res, next) {
       caseId: clause.caseId,
       userId: req.user.id,
       message: message.trim(),
+    });
+
+    await recordAuditLog({
+      caseId: clause.caseId,
+      clauseId,
+      userId: req.user.id,
+      type: "COMMENT_ADDED",
+      title: `Comment added: ${clause.title}`,
+      message: `A comment was added to ${clause.title}.`,
+      metadata: { preview: message.trim().slice(0, 120) },
     });
 
     res.status(201).json({ comment });

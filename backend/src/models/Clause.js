@@ -11,10 +11,22 @@ const clauseSchema = new mongoose.Schema(
     templateId: { type: String, default: null },
     templateTitle: { type: String, default: null },
     templateJurisdiction: { type: String, default: null },
+
+    // template-level review
     templateReviewStatus: { type: String, default: null },
     templateReviewedBy: { type: String, default: null },
     templateReviewedOn: { type: String, default: null },
     templateDisclaimer: { type: String, default: null },
+
+    // clause-level legal moderator review
+    adminReviewStatus: {
+      type: String,
+      enum: ["NOT_REVIEWED", "REVIEWED", "NEEDS_REVISION"],
+      default: "NOT_REVIEWED",
+    },
+    adminReviewNote: { type: String, default: "" },
+    adminReviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    adminReviewedAt: { type: Date, default: null },
 
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
