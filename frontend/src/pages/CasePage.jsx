@@ -767,41 +767,6 @@ export default function CasePage() {
                 rows={3}
                 className="case-textarea"
               />
-
-              <section className="case-rewrite-box" aria-labelledby="rewrite-heading">
-                <div>
-                  <h3 id="rewrite-heading" className="case-section-small-title">AI clause rewrite</h3>
-                  <p className="case-panel-subtitle">
-                    Generate a drafting preview without changing the saved clause.
-                  </p>
-                </div>
-                <div className="case-rewrite-controls">
-                  <label className="case-field">
-                    <span className="case-label">Rewrite style</span>
-                    <select className="case-select" value={rewriteMode}
-                      onChange={(e) => { setRewriteMode(e.target.value); setRewritePreview(null); }}>
-                      <option value="CLEAR">Clearer language</option>
-                      <option value="CONCISE">More concise</option>
-                      <option value="FORMAL">More formal</option>
-                    </select>
-                  </label>
-                  <button type="button" className="case-button case-button-secondary"
-                    onClick={onPreviewRewrite} disabled={rewriteBusy || busy || !draftContent.trim()}>
-                    {rewriteBusy ? "Generating..." : "Generate rewrite"}
-                  </button>
-                </div>
-                {rewritePreview && (
-                  <div className="case-rewrite-preview" aria-live="polite">
-                    <div className="case-review-label">Suggested rewrite</div>
-                    <p>{rewritePreview.rewrittenContent}</p>
-                    <div className="case-help-note">{rewritePreview.disclaimer}</div>
-                    <div className="case-editor-actions">
-                      <button type="button" className="case-button case-button-primary" onClick={onUseRewrite}>Use this draft</button>
-                      <button type="button" className="case-button case-button-secondary" onClick={() => setRewritePreview(null)}>Discard</button>
-                    </div>
-                  </div>
-                )}
-              </section>
             </label>
           ))}
 
@@ -1338,6 +1303,41 @@ export default function CasePage() {
                 className="case-textarea case-editor-textarea"
                 placeholder="Write the clause text here..."
               />
+
+              <section className="case-rewrite-box" aria-labelledby="rewrite-heading">
+                <div>
+                  <h3 id="rewrite-heading" className="case-section-small-title">AI clause rewrite</h3>
+                  <p className="case-panel-subtitle">
+                    Generate a drafting preview without changing the saved clause.
+                  </p>
+                </div>
+                <div className="case-rewrite-controls">
+                  <label className="case-field">
+                    <span className="case-label">Rewrite style</span>
+                    <select className="case-select" value={rewriteMode}
+                      onChange={(e) => { setRewriteMode(e.target.value); setRewritePreview(null); }}>
+                      <option value="CLEAR">Clearer language</option>
+                      <option value="CONCISE">More concise</option>
+                      <option value="FORMAL">More formal</option>
+                    </select>
+                  </label>
+                  <button type="button" className="case-button case-button-secondary"
+                    onClick={onPreviewRewrite} disabled={rewriteBusy || busy || !draftContent.trim()}>
+                    {rewriteBusy ? "Generating..." : "Generate rewrite"}
+                  </button>
+                </div>
+                {rewritePreview && (
+                  <div className="case-rewrite-preview" aria-live="polite">
+                    <div className="case-review-label">Suggested rewrite</div>
+                    <p>{rewritePreview.rewrittenContent}</p>
+                    <div className="case-help-note">{rewritePreview.disclaimer}</div>
+                    <div className="case-editor-actions">
+                      <button type="button" className="case-button case-button-primary" onClick={onUseRewrite}>Use this draft</button>
+                      <button type="button" className="case-button case-button-secondary" onClick={() => setRewritePreview(null)}>Discard</button>
+                    </div>
+                  </div>
+                )}
+              </section>
 
               <div className="case-editor-actions">
                 <button
