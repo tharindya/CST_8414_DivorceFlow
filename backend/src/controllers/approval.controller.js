@@ -2,6 +2,7 @@ const ClauseAction = require("../models/ClauseAction");
 const Clause = require("../models/Clause");
 const Case = require("../models/Case");
 const Comment = require("../models/Comment");
+const { recordAuditLog } = require("../services/audit.service");
 
 async function recomputeCaseStatus(caseId) {
   const caseDoc = await Case.findById(caseId).select("participants status");
@@ -62,7 +63,7 @@ async function approveClause(req, res, next) {
   try {
     const { clauseId } = req.params;
 
-    const clause = await Clause.findById(clauseId).select("caseId");
+    const clause = await Clause.findById(clauseId).select("caseId title");
     if (!clause) {
       return res.status(404).json({ error: "Clause not found" });
     }
@@ -75,6 +76,15 @@ async function approveClause(req, res, next) {
     });
 
     await recomputeCaseStatus(clause.caseId);
+
+    await recordAuditLog({
+      caseId: clause.caseId,
+      clauseId,
+      userId: req.user.id,
+      type: "CLAUSE_APPROVED",
+      title: `Clause approved: ${clause.title}`,
+      message: `${clause.title} was approved by a party.`,
+    });
 
     res.status(201).json({ action });
   } catch (err) {
@@ -91,7 +101,7 @@ async function rejectClause(req, res, next) {
       return res.status(400).json({ error: "Reject requires a comment" });
     }
 
-    const clause = await Clause.findById(clauseId).select("caseId");
+    const clause = await Clause.findById(clauseId).select("caseId title");
     if (!clause) {
       return res.status(404).json({ error: "Clause not found" });
     }
@@ -111,6 +121,16 @@ async function rejectClause(req, res, next) {
     });
 
     await recomputeCaseStatus(clause.caseId);
+
+    await recordAuditLog({
+      caseId: clause.caseId,
+      clauseId,
+      userId: req.user.id,
+      type: "CLAUSE_REJECTED",
+      title: `Clause rejected: ${clause.title}`,
+      message: `${clause.title} was rejected with feedback.`,
+      metadata: { reason: comment.trim() },
+    });
 
     res.status(201).json({ action });
   } catch (err) {

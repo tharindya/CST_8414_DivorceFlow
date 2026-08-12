@@ -5,7 +5,9 @@ const authRoutes = require("./routes/auth.routes");
 const templateRoutes = require("./routes/template.routes");
 const exportRoutes = require("./routes/export.routes");
 const mockReviewRoutes = require("./routes/mockReview.routes");
+const adminRoutes = require("./routes/admin.routes");
 const { errorHandler } = require("./middleware/error");
+const messageRoutes = require("./routes/message.routes");
 
 const app = express();
 
@@ -24,15 +26,16 @@ app.get("/health", (_req, res) => {
 
 app.use("/auth", authRoutes);
 
-// other routes (require auth)
 app.use("/cases", require("./routes/case.routes"));
 app.use("/", require("./routes/clause.routes"));
 app.use("/", require("./routes/workflow.routes"));
 app.use("/", exportRoutes);
 app.use("/", templateRoutes);
 app.use("/", mockReviewRoutes);
+app.use("/", messageRoutes);
 
-// Error handler must be last
+app.use("/admin", adminRoutes);
+
 app.use(errorHandler);
 
 module.exports = { app };

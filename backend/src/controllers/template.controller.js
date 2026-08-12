@@ -1,23 +1,42 @@
 const { clauseTemplates } = require("../data/clauseTemplates");
+const TemplateReview = require("../models/TemplateReview");
+
+function buildTemplateResponse(template, reviewDoc) {
+  return {
+    id: template.id,
+    title: template.title,
+    category: template.category,
+    jurisdiction: template.jurisdiction,
+
+    reviewStatus: reviewDoc?.reviewStatus || "NOT_REVIEWED",
+    reviewedBy: reviewDoc?.reviewedBy?.email || reviewDoc?.reviewedBy?.name || null,
+    reviewedOn: reviewDoc?.reviewedAt
+      ? new Date(reviewDoc.reviewedAt).toISOString()
+      : null,
+    disclaimer: reviewDoc?.reviewNote || "",
+
+    description: template.description,
+    placeholders: template.placeholders,
+  };
+}
 
 async function listTemplates(req, res, next) {
   try {
     const jurisdiction = String(req.query.jurisdiction || "General").trim();
 
-    const templates = clauseTemplates
-      .filter((t) => t.jurisdiction === "General" || t.jurisdiction === jurisdiction)
-      .map((t) => ({
-        id: t.id,
-        title: t.title,
-        category: t.category,
-        jurisdiction: t.jurisdiction,
-        reviewStatus: t.reviewStatus,
-        reviewedBy: t.reviewedBy,
-        reviewedOn: t.reviewedOn,
-        disclaimer: t.disclaimer,
-        description: t.description,
-        placeholders: t.placeholders,
-      }));
+    const filteredTemplates = clauseTemplates.filter(
+      (t) => t.jurisdiction === "General" || t.jurisdiction === jurisdiction
+    );
+
+    const reviews = await TemplateReview.find({
+      templateId: { $in: filteredTemplates.map((t) => t.id) },
+    }).populate("reviewedBy", "name email");
+
+    const reviewMap = new Map(reviews.map((r) => [r.templateId, r]));
+
+    const templates = filteredTemplates.map((t) =>
+      buildTemplateResponse(t, reviewMap.get(t.id))
+    );
 
     res.json({ templates });
   } catch (err) {
@@ -49,18 +68,13 @@ async function buildTemplateDraft(req, res, next) {
     const content =
       typeof template.buildContent === "function" ? template.buildContent(values) : "";
 
+    const reviewDoc = await TemplateReview.findOne({ templateId }).populate(
+      "reviewedBy",
+      "name email"
+    );
+
     res.json({
-      template: {
-        id: template.id,
-        title: template.title,
-        category: template.category,
-        jurisdiction: template.jurisdiction,
-        reviewStatus: template.reviewStatus,
-        reviewedBy: template.reviewedBy,
-        reviewedOn: template.reviewedOn,
-        disclaimer: template.disclaimer,
-        description: template.description,
-      },
+      template: buildTemplateResponse(template, reviewDoc),
       content,
     });
   } catch (err) {

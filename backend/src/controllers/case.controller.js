@@ -1,6 +1,21 @@
 const crypto = require("crypto");
 const Case = require("../models/Case");
 const { sendCaseInviteEmail } = require("../services/email.service");
+const {
+  buildIntakeRecommendations,
+} = require("../services/intakeRecommendations.service");
+const { recordAuditLog } = require("../services/audit.service");
+
+const CASE_SELECT_FIELDS =
+  "_id title status participants jurisdiction intake inviteCode inviteUsed partyBEmail invitationStatus createdAt updatedAt";
+
+const INTAKE_FIELDS = [
+  "dependents",
+  "assets",
+  "debts",
+  "supportRequirements",
+  "custodyPreferences",
+];
 
 function makeInviteCode() {
   return crypto.randomBytes(4).toString("hex").toUpperCase();
@@ -17,6 +32,22 @@ function normalizeEmail(value) {
 function normalizeJurisdiction(value) {
   const allowed = ["General", "Ontario", "Quebec", "British Columbia", "Alberta"];
   return allowed.includes(value) ? value : "General";
+}
+
+function normalizeIntakePayload(payload = {}, userId) {
+  const intake = {};
+
+  for (const field of INTAKE_FIELDS) {
+    intake[field] = String(payload[field] || "").trim();
+  }
+
+  const completed = INTAKE_FIELDS.every((field) => intake[field].length > 0);
+
+  intake.completed = completed;
+  intake.completedAt = completed ? new Date() : null;
+  intake.updatedBy = userId || null;
+
+  return intake;
 }
 
 async function createCase(req, res, next) {
@@ -38,6 +69,7 @@ async function createCase(req, res, next) {
       title: title.trim(),
       participants: [{ userId: req.user.id, role: "PARTY_A" }],
       jurisdiction: normalizeJurisdiction(jurisdiction),
+      intake: normalizeIntakePayload(req.body.intake || {}, req.user.id),
       inviteCode,
       inviteUsed: false,
       status: "DRAFT",
@@ -56,9 +88,7 @@ async function listMyCases(req, res, next) {
   try {
     const cases = await Case.find({ "participants.userId": req.user.id })
       .sort({ updatedAt: -1 })
-      .select(
-        "_id title status participants jurisdiction inviteCode inviteUsed partyBEmail invitationStatus createdAt updatedAt"
-      );
+      .select(CASE_SELECT_FIELDS);
 
     res.json({ cases });
   } catch (err) {
@@ -70,13 +100,68 @@ async function getCase(req, res, next) {
   try {
     const { caseId } = req.params;
 
-    const doc = await Case.findById(caseId).select(
-      "_id title status participants jurisdiction inviteCode inviteUsed partyBEmail invitationStatus createdAt updatedAt"
-    );
+    const doc = await Case.findById(caseId).select(CASE_SELECT_FIELDS);
 
-    if (!doc) return res.status(404).json({ error: "Case not found" });
+    if (!doc) {
+      return res.status(404).json({ error: "Case not found" });
+    }
 
     res.json({ case: doc });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function updateIntake(req, res, next) {
+  try {
+    const { caseId } = req.params;
+
+    const doc = await Case.findById(caseId);
+
+    if (!doc) {
+      return res.status(404).json({ error: "Case not found" });
+    }
+
+    doc.intake = normalizeIntakePayload(req.body || {}, req.user.id);
+    await doc.save();
+
+    const updated = await Case.findById(caseId).select(CASE_SELECT_FIELDS);
+
+    await recordAuditLog({
+      caseId,
+      userId: req.user.id,
+      type: "CASE_INTAKE_UPDATED",
+      title: "Guided intake updated",
+      message: updated.intake?.completed
+        ? "Guided case intake was completed."
+        : "Guided case intake was saved but is still incomplete.",
+      metadata: { completed: !!updated.intake?.completed },
+    });
+
+    res.json({
+      message: updated.intake?.completed
+        ? "Guided intake completed"
+        : "Guided intake saved",
+      case: updated,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getIntakeRecommendations(req, res, next) {
+  try {
+    const { caseId } = req.params;
+
+    const doc = await Case.findById(caseId);
+
+    if (!doc) {
+      return res.status(404).json({ error: "Case not found" });
+    }
+
+    const result = await buildIntakeRecommendations(doc);
+
+    res.json(result);
   } catch (err) {
     next(err);
   }
@@ -92,12 +177,18 @@ async function joinCase(req, res, next) {
     }
 
     const doc = await Case.findById(caseId);
-    if (!doc) return res.status(404).json({ error: "Case not found" });
+
+    if (!doc) {
+      return res.status(404).json({ error: "Case not found" });
+    }
 
     const alreadyParticipant = doc.participants.some(
       (p) => p.userId.toString() === req.user.id
     );
-    if (alreadyParticipant) return res.json({ case: doc });
+
+    if (alreadyParticipant) {
+      return res.json({ case: doc });
+    }
 
     if (doc.inviteUsed) {
       return res.status(409).json({ error: "Invite already used" });
@@ -111,7 +202,16 @@ async function joinCase(req, res, next) {
     doc.inviteUsed = true;
     doc.invitationStatus = "ACCEPTED";
     doc.status = "NEGOTIATING";
+
     await doc.save();
+
+    await recordAuditLog({
+      caseId,
+      userId: req.user.id,
+      type: "CASE_JOINED",
+      title: "Case joined",
+      message: "The invited party joined the case using the invite code.",
+    });
 
     res.json({ case: doc });
   } catch (err) {
@@ -124,7 +224,10 @@ async function sendInvite(req, res, next) {
     const { caseId } = req.params;
 
     const doc = await Case.findById(caseId);
-    if (!doc) return res.status(404).json({ error: "Case not found" });
+
+    if (!doc) {
+      return res.status(404).json({ error: "Case not found" });
+    }
 
     const isPartyA = doc.participants.some(
       (p) => p.userId.toString() === req.user.id && p.role === "PARTY_A"
@@ -154,6 +257,15 @@ async function sendInvite(req, res, next) {
 
     doc.invitationStatus = "SENT";
     await doc.save();
+
+    await recordAuditLog({
+      caseId,
+      userId: req.user.id,
+      type: "INVITE_SENT",
+      title: "Invitation sent",
+      message: `An invitation email was sent to ${doc.partyBEmail}.`,
+      metadata: { partyBEmail: doc.partyBEmail },
+    });
 
     res.json({
       message: "Invitation email sent",
@@ -191,6 +303,8 @@ module.exports = {
   createCase,
   listMyCases,
   getCase,
+  updateIntake,
+  getIntakeRecommendations,
   joinCase,
   sendInvite,
   getInviteByToken,

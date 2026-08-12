@@ -7,6 +7,10 @@ const { listComments, addComment } = require("../controllers/comment.controller"
 const { approveClause, rejectClause } = require("../controllers/approval.controller");
 
 const { getClauseStatusSummary } = require("../controllers/approval.controller");
+const {
+  listClauseVersions,
+  listCaseAudit,
+} = require("../controllers/audit.controller");
 
 // Helper: ensure the current user is a participant in the clause's case
 async function requireClauseCaseAccess(req, res, next) {
@@ -20,6 +24,10 @@ async function requireClauseCaseAccess(req, res, next) {
     next(err);
   }
 }
+
+// Version history and audit trail
+router.get("/clauses/:clauseId/versions", requireAuth, requireClauseCaseAccess, listClauseVersions);
+router.get("/cases/:caseId/audit", requireAuth, requireCaseParticipant, listCaseAudit);
 
 // Comments
 router.get("/clauses/:clauseId/comments", requireAuth, requireClauseCaseAccess, listComments);

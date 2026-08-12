@@ -58,6 +58,25 @@ export const api = {
 
   me: () => request("/auth/me"),
 
+  // admin
+  listAdminCases: () => request("/admin/cases"),
+
+  getAdminCase: (caseId) => request(`/admin/cases/${caseId}`),
+
+  listAdminTemplates: () => request("/admin/templates"),
+
+  updateAdminTemplateReview: (templateId, body) =>
+    request(`/admin/templates/${templateId}/review`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+
+  updateAdminClauseReview: (clauseId, body) =>
+    request(`/admin/clauses/${clauseId}/review`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+
   // cases
   listCases: () => request("/cases"),
 
@@ -74,6 +93,15 @@ export const api = {
     }),
 
   getCase: (caseId) => request(`/cases/${caseId}`),
+
+  updateCaseIntake: (caseId, payload) =>
+    request(`/cases/${caseId}/intake`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+
+  getIntakeRecommendations: (caseId) =>
+    request(`/cases/${caseId}/intake/recommendations`),
 
   // templates
   listTemplates: (jurisdiction) =>
@@ -102,6 +130,10 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  listClauseVersions: (clauseId) => request(`/clauses/${clauseId}/versions`),
+
+  listCaseAudit: (caseId) => request(`/cases/${caseId}/audit`),
+
   // workflow
   getClauseStatus: (caseId) => request(`/cases/${caseId}/clauses/status`),
 
@@ -127,7 +159,7 @@ export const api = {
   // export
   getExportCheck: (caseId) => request(`/cases/${caseId}/export/check`),
 
-  //Mock Review
+  // mock review
   getMockReview: (caseId) => request(`/cases/${caseId}/mock-review`),
 
   downloadCasePdf: async (caseId) => {

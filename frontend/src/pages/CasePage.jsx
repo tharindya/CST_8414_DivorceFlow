@@ -1,6 +1,133 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api } from "../api/client";
+import "../styles/case-page.css";
+
+function caseStatusClass(status) {
+  switch ((status || "").toUpperCase()) {
+    case "READY":
+      return "case-status-ready";
+    case "NEGOTIATING":
+      return "case-status-negotiating";
+    case "EXPORTED":
+      return "case-status-exported";
+    case "DRAFT":
+    default:
+      return "case-status-draft";
+  }
+}
+
+function clauseOverallTone(statusRow) {
+  if (!statusRow) return "default";
+  if (statusRow.overallState === "REJECTED") return "danger";
+  if (statusRow.isApprovedByBoth) return "success";
+  return "warning";
+}
+
+function clauseOverallLabel(statusRow) {
+  if (!statusRow) return "Pending";
+  if (statusRow.overallState === "REJECTED") return "Rejected";
+  if (statusRow.isApprovedByBoth) return "Approved";
+  return "Pending";
+}
+
+function actorMark(approved, rejected) {
+  if (rejected) return "Rejected";
+  if (approved) return "Approved";
+  return "Pending";
+}
+
+function reviewTone(status) {
+  switch ((status || "").toUpperCase()) {
+    case "REVIEWED":
+      return "success";
+    case "NEEDS_REVISION":
+      return "danger";
+    case "NOT_REVIEWED":
+    default:
+      return "default";
+  }
+}
+
+function reviewLabel(status) {
+  if (!status) return "NOT_REVIEWED";
+  return status;
+}
+
+function reviewPerson(value) {
+  if (!value) return "Not reviewed";
+  if (typeof value === "object") {
+    return value.email || value.name || "Reviewer";
+  }
+  return value;
+}
+
+function actorDisplay(value) {
+  if (!value) return "System";
+  if (typeof value === "object") {
+    return value.name || value.email || "User";
+  }
+  return value;
+}
+
+const EMPTY_INTAKE = {
+  dependents: "",
+  assets: "",
+  debts: "",
+  supportRequirements: "",
+  custodyPreferences: "",
+};
+
+const INTAKE_FIELDS = [
+  {
+    key: "dependents",
+    label: "Dependents",
+    placeholder: "List children or dependents, or state that there are none.",
+  },
+  {
+    key: "assets",
+    label: "Assets",
+    placeholder: "Summarize major assets such as home, vehicles, savings, or shared property.",
+  },
+  {
+    key: "debts",
+    label: "Debts",
+    placeholder: "Summarize debts such as loans, credit cards, mortgages, or state none.",
+  },
+  {
+    key: "supportRequirements",
+    label: "Support requirements",
+    placeholder: "Describe spousal support, child support, or state that no support is requested.",
+  },
+  {
+    key: "custodyPreferences",
+    label: "Custody preferences",
+    placeholder: "Describe parenting time, decision-making, or state that custody does not apply.",
+  },
+];
+
+function normalizeIntakeForForm(intake) {
+  return {
+    dependents: intake?.dependents || "",
+    assets: intake?.assets || "",
+    debts: intake?.debts || "",
+    supportRequirements: intake?.supportRequirements || "",
+    custodyPreferences: intake?.custodyPreferences || "",
+  };
+}
+
+function intakeCompletionStats(intake) {
+  const total = INTAKE_FIELDS.length;
+  const completed = INTAKE_FIELDS.filter((field) =>
+    String(intake?.[field.key] || "").trim()
+  ).length;
+
+  return {
+    total,
+    completed,
+    percent: Math.round((completed / total) * 100),
+  };
+}
 
 export default function CasePage() {
   const { caseId } = useParams();
@@ -14,6 +141,16 @@ export default function CasePage() {
   const [exportCheck, setExportCheck] = useState(null);
   const [mockReview, setMockReview] = useState(null);
   const [reviewBusy, setReviewBusy] = useState(false);
+  const [intakeDraft, setIntakeDraft] = useState(EMPTY_INTAKE);
+  const [intakeSaving, setIntakeSaving] = useState(false);
+  const [intakeMessage, setIntakeMessage] = useState("");
+  const [intakeRecommendations, setIntakeRecommendations] = useState({
+    warnings: [],
+    recommendations: [],
+  });
+  const [recommendationBusy, setRecommendationBusy] = useState(false);
+
+  const intakeStats = useMemo(() => intakeCompletionStats(intakeDraft), [intakeDraft]);
 
   const [selectedClauseId, setSelectedClauseId] = useState(null);
   const selectedClause = useMemo(
@@ -36,6 +173,9 @@ export default function CasePage() {
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
 
+  const [clauseVersions, setClauseVersions] = useState([]);
+  const [auditEvents, setAuditEvents] = useState([]);
+
   async function loadExportCheck(currentCaseDoc) {
     if (!currentCaseDoc || currentCaseDoc.status !== "READY") {
       setExportCheck(null);
@@ -50,6 +190,35 @@ export default function CasePage() {
     }
   }
 
+  function onIntakeChange(field, value) {
+    setIntakeDraft((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  }
+
+  async function onSaveIntake(e) {
+    e.preventDefault();
+
+    try {
+      setError("");
+      setIntakeMessage("");
+      setIntakeSaving(true);
+
+      const data = await api.updateCaseIntake(caseId, intakeDraft);
+      setCaseDoc(data.case);
+      setIntakeDraft(normalizeIntakeForForm(data.case?.intake));
+      setIntakeMessage(data.message || "Guided intake saved");
+      setMockReview(null);
+      await loadIntakeRecommendations();
+      await loadAuditTrail();
+    } catch (err) {
+      setError(err.message || "Failed to save guided intake");
+    } finally {
+      setIntakeSaving(false);
+    }
+  }
+
   async function onRunMockReview() {
     try {
       setError("");
@@ -60,6 +229,42 @@ export default function CasePage() {
       setError(err.message || "Failed to run mock review");
     } finally {
       setReviewBusy(false);
+    }
+  }
+
+  async function loadIntakeRecommendations() {
+    try {
+      const data = await api.getIntakeRecommendations(caseId);
+
+      setIntakeRecommendations({
+        warnings: data.warnings || [],
+        recommendations: data.recommendations || [],
+      });
+    } catch (err) {
+      setError(err.message || "Failed to load intake recommendations");
+    }
+  }
+
+  async function loadAuditTrail() {
+    try {
+      const data = await api.listCaseAudit(caseId);
+      setAuditEvents(data.events || []);
+    } catch (err) {
+      setError(err.message || "Failed to load audit trail");
+    }
+  }
+
+  async function loadClauseVersions(clauseId) {
+    if (!clauseId) {
+      setClauseVersions([]);
+      return;
+    }
+
+    try {
+      const data = await api.listClauseVersions(clauseId);
+      setClauseVersions(data.versions || []);
+    } catch (err) {
+      setError(err.message || "Failed to load clause versions");
     }
   }
 
@@ -77,11 +282,15 @@ export default function CasePage() {
       const loadedTemplates = templateRes.templates || [];
 
       setCaseDoc(caseRes.case);
+      setIntakeDraft(normalizeIntakeForForm(caseRes.case?.intake));
+      setIntakeMessage("");
       setClauses(loadedClauses);
       setStatusRows(statusRes.clauses || []);
       setTemplates(loadedTemplates);
       setMockReview(null);
       await loadExportCheck(caseRes.case);
+      await loadIntakeRecommendations();
+      await loadAuditTrail();
 
       const first = loadedClauses[0];
       if (!selectedClauseId && first?._id) {
@@ -117,9 +326,11 @@ export default function CasePage() {
     if (selectedClause) {
       setDraftContent(selectedClause.contentCurrent || "");
       loadCommentsForClause(selectedClause._id);
+      loadClauseVersions(selectedClause._id);
     } else {
       setDraftContent("");
       setComments([]);
+      setClauseVersions([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClauseId, selectedClause]);
@@ -180,6 +391,42 @@ export default function CasePage() {
     }
   }
 
+  async function onAddRecommendedClause(recommendation) {
+    try {
+      setError("");
+      setRecommendationBusy(true);
+
+      const data = await api.createClause(caseId, {
+        title: recommendation.title,
+        category: recommendation.category,
+        contentCurrent: recommendation.contentCurrent,
+      });
+
+      const created = data.clause;
+
+      setClauses((prev) =>
+        [...prev, created].sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0))
+      );
+
+      const statusRes = await api.getClauseStatus(caseId);
+      const nextCase = { ...(caseDoc || {}), status: statusRes.caseStatus };
+
+      setStatusRows(statusRes.clauses || []);
+      setCaseDoc(nextCase);
+      setSelectedClauseId(created._id);
+      setMockReview(null);
+
+      await loadExportCheck(nextCase);
+      await loadIntakeRecommendations();
+      await loadAuditTrail();
+      await loadClauseVersions(created._id);
+    } catch (err) {
+      setError(err.message || "Failed to add recommended clause");
+    } finally {
+      setRecommendationBusy(false);
+    }
+  }
+
   async function onCreateClause(e) {
     e.preventDefault();
     setError("");
@@ -201,7 +448,7 @@ export default function CasePage() {
       });
 
       const created = data.clause;
-      const nextClauses = [...clauses, created].sort(
+      const nextClauses = [...clauses].concat(created).sort(
         (a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0)
       );
 
@@ -214,6 +461,9 @@ export default function CasePage() {
       setCaseDoc(nextCase);
       setMockReview(null);
       await loadExportCheck(nextCase);
+      await loadIntakeRecommendations();
+      await loadAuditTrail();
+      await loadClauseVersions(created._id);
 
       setSelectedTemplateId("");
       setTemplateDetails(null);
@@ -250,6 +500,9 @@ export default function CasePage() {
       setCaseDoc(nextCase);
       setMockReview(null);
       await loadExportCheck(nextCase);
+      await loadIntakeRecommendations();
+      await loadAuditTrail();
+      await loadClauseVersions(updated._id);
     } catch (err) {
       setError(err.message || "Failed to save clause");
     } finally {
@@ -269,6 +522,7 @@ export default function CasePage() {
       setCommentText("");
       setMockReview(null);
       await loadCommentsForClause(selectedClause._id);
+      await loadAuditTrail();
     } catch (err) {
       setError(err.message || "Failed to add comment");
     } finally {
@@ -292,6 +546,7 @@ export default function CasePage() {
       setCaseDoc(nextCase);
       setMockReview(null);
       await loadExportCheck(nextCase);
+      await loadAuditTrail();
     } catch (err) {
       setError(err.message || "Failed to approve");
     } finally {
@@ -336,6 +591,7 @@ export default function CasePage() {
       setCaseDoc(nextCase);
       setMockReview(null);
       await loadExportCheck(nextCase);
+      await loadAuditTrail();
 
       setRejectModalOpen(false);
       setRejectReason("");
@@ -370,262 +626,391 @@ export default function CasePage() {
   }, [rejectModalOpen, busy]);
 
   if (loading) {
-    return <div style={{ padding: 16 }}>Loading...</div>;
+    return (
+      <div className="case-page">
+        <div className="case-loading">Loading case...</div>
+      </div>
+    );
   }
 
   return (
-    <div style={{ maxWidth: 1200, margin: "24px auto", padding: 16 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 12,
-        }}
-      >
-        <div>
-          <div style={{ fontSize: 14, color: "#666" }}>
-            <Link to="/dashboard">← Back</Link>
-          </div>
-          <h2 style={{ margin: "6px 0" }}>{caseDoc?.title || "Case"}</h2>
-          <div style={{ fontSize: 13, color: "#555" }}>
-            Status: <b>{caseDoc?.status}</b> &nbsp; | &nbsp; Case ID: <code>{caseId}</code>
-          </div>
-          <div style={{ fontSize: 13, color: "#555" }}>
-            Jurisdiction: <b>{caseDoc?.jurisdiction || "General"}</b>
-          </div>
-          {caseDoc?.inviteCode && (
-            <div style={{ fontSize: 13, color: "#555" }}>
-              Invite Code: <code>{caseDoc.inviteCode}</code>{" "}
-              {caseDoc.inviteUsed ? "(used)" : "(not used)"}
+    <div className="case-page">
+      <section className="case-hero">
+        <div className="case-hero-main">
+          <Link to="/dashboard" className="case-back-link">
+            <span>←</span>
+            <span>Back to Dashboard</span>
+          </Link>
+
+          <div className="case-eyebrow">Agreement workspace</div>
+
+          <h1 className="case-title">{caseDoc?.title || "Case"}</h1>
+
+          <p className="case-subtitle">
+            Review clauses, apply templates, negotiate edits, and move the agreement toward
+            final export.
+          </p>
+
+          <div className="case-meta-grid">
+            <div className="case-meta-card">
+              <span className="case-meta-label">Status</span>
+              <div className={`case-status-badge ${caseStatusClass(caseDoc?.status)}`}>
+                {caseDoc?.status || "DRAFT"}
+              </div>
             </div>
-          )}
+
+            <div className="case-meta-card">
+              <span className="case-meta-label">Jurisdiction</span>
+              <div className="case-meta-value">{caseDoc?.jurisdiction || "General"}</div>
+            </div>
+
+            <div className="case-meta-card">
+              <span className="case-meta-label">Case ID</span>
+              <code className="case-code">{caseId}</code>
+            </div>
+
+            {caseDoc?.inviteCode && (
+              <div className="case-meta-card">
+                <span className="case-meta-label">Invite</span>
+                <div className="case-meta-value">
+                  <code className="case-code-inline">{caseDoc.inviteCode}</code>
+                  <span className="case-inline-note">
+                    {caseDoc.inviteUsed ? "Used" : "Not used"}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10 }}>
+        <div className="case-hero-actions">
+          <button
+            type="button"
+            onClick={onRunMockReview}
+            disabled={reviewBusy || busy}
+            className="case-button case-button-secondary"
+          >
+            {reviewBusy ? "Running review..." : "Run mock review"}
+          </button>
+
           {caseDoc?.status === "READY" && (
-            <button onClick={onDownloadPdf} disabled={busy} style={{ padding: "8px 12px" }}>
+            <button
+              type="button"
+              onClick={onDownloadPdf}
+              disabled={busy}
+              className="case-button case-button-primary"
+            >
               Download PDF
             </button>
           )}
         </div>
-      </div>
+      </section>
 
-      {caseDoc?.status === "READY" && exportCheck && (
-        <div
-          style={{
-            marginTop: 12,
-            border: "1px solid #f0d58a",
-            background: "#fff6df",
-            padding: 12,
-          }}
-        >
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>
-            Drafting Completeness Review
+      {error && <div className="case-alert case-alert-error">{error}</div>}
+
+      <section className="case-panel case-intake-panel">
+        <div className="case-panel-header case-intake-header">
+          <div>
+            <h2 className="case-panel-title">Guided case intake</h2>
+            <p className="case-panel-subtitle">
+              Capture the key case details needed for templates, AI clause suggestions,
+              agreement review, and final signing readiness.
+            </p>
           </div>
 
-          <div style={{ fontSize: 12, color: "#7a4d00", marginBottom: 8 }}>
-            {exportCheck.disclaimer}
+          <div className="case-intake-progress" aria-label="Guided intake completion">
+            <span>{caseDoc?.intake?.completed ? "Complete" : "In progress"}</span>
+            <strong>
+              {intakeStats.completed}/{intakeStats.total} sections
+            </strong>
           </div>
+        </div>
 
-          {exportCheck.warnings?.length === 0 ? (
-            <div style={{ color: "#1f6f2a", fontWeight: 600 }}>
-              No major missing sections were detected.
+        {intakeMessage && (
+          <div className="case-alert case-alert-success case-alert-inline">
+            {intakeMessage}
+          </div>
+        )}
+
+        <form onSubmit={onSaveIntake} className="case-intake-form">
+          {INTAKE_FIELDS.map((field) => (
+            <label key={field.key} className="case-field">
+              <span className="case-label">{field.label}</span>
+              <textarea
+                value={intakeDraft[field.key]}
+                onChange={(e) => onIntakeChange(field.key, e.target.value)}
+                placeholder={field.placeholder}
+                rows={3}
+                className="case-textarea"
+              />
+            </label>
+          ))}
+
+          <div className="case-intake-footer">
+            <div className="case-help-note">
+              Intake completion is based on all five sections being filled. Use “None” or
+              “Not applicable” when a section does not apply.
+            </div>
+
+            <button
+              type="submit"
+              disabled={intakeSaving}
+              className="case-button case-button-primary"
+            >
+              {intakeSaving ? "Saving intake..." : "Save guided intake"}
+            </button>
+          </div>
+        </form>
+
+        <div className="case-intake-recommendations">
+          <h3 className="case-section-small-title">Intake recommendations</h3>
+
+          {intakeRecommendations.warnings.length > 0 && (
+            <div className="case-warning-list">
+              {intakeRecommendations.warnings.map((warning) => (
+                <div key={warning.id} className="case-warning-card">
+                  <div className="case-warning-title">
+                    {warning.title}
+                    <span
+                      className={`case-warning-severity case-warning-${warning.severity?.toLowerCase()}`}
+                    >
+                      {warning.severity}
+                    </span>
+                  </div>
+                  <p>{warning.message}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {intakeRecommendations.recommendations.length > 0 ? (
+            <div className="case-recommendation-list">
+              {intakeRecommendations.recommendations.map((recommendation) => (
+                <div key={recommendation.id} className="case-recommendation-card">
+                  <div>
+                    <div className="case-recommendation-title">
+                      {recommendation.title}
+                    </div>
+                    <div className="case-recommendation-category">
+                      {recommendation.category}
+                    </div>
+                    <p className="case-recommendation-reason">
+                      {recommendation.reason}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={recommendationBusy}
+                    onClick={() => onAddRecommendedClause(recommendation)}
+                    className="case-button case-button-secondary"
+                  >
+                    Add suggested clause
+                  </button>
+                </div>
+              ))}
             </div>
           ) : (
-            <>
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>Warnings:</div>
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {exportCheck.warnings.map((warning) => (
-                  <li key={warning} style={{ marginBottom: 4 }}>
-                    {warning}
-                  </li>
-                ))}
-              </ul>
-            </>
+            <div className="case-empty-card case-empty-card-tight">
+              No missing intake-based clauses detected.
+            </div>
           )}
         </div>
-      )}
+      </section>
 
-      <div
-        style={{
-          marginTop: 12,
-          border: "1px solid #d9d9d9",
-          background: "#fafafa",
-          padding: 12,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 12,
-            marginBottom: 8,
-          }}
-        >
-          <div style={{ fontWeight: 700 }}>Mock Legal Review</div>
-          <button
-            onClick={onRunMockReview}
-            disabled={reviewBusy || busy}
-            style={{ padding: "8px 12px" }}
-          >
-            {reviewBusy ? "Running Review..." : "Run Review"}
-          </button>
-        </div>
-
-        {!mockReview ? (
-          <div style={{ fontSize: 13, color: "#666" }}>
-            Run a simulated review to generate demo legal-review feedback.
-          </div>
-        ) : (
-          <>
-            <div style={{ fontSize: 13, marginBottom: 8 }}>
-              <b>Summary:</b> {mockReview.summary}
+      <section className="case-review-grid">
+        {caseDoc?.status === "READY" && exportCheck && (
+          <div className="case-review-card case-review-card-warning">
+            <div className="case-review-header">
+              <h2 className="case-review-title">Drafting completeness review</h2>
             </div>
 
-            <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>
-              {mockReview.disclaimer}
-            </div>
+            <p className="case-review-copy">{exportCheck.disclaimer}</p>
 
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>Issues</div>
-              {mockReview.issues?.length ? (
-                <div style={{ display: "grid", gap: 8 }}>
-                  {mockReview.issues.map((issue, index) => (
-                    <div
-                      key={`${issue.title}-${index}`}
-                      style={{
-                        border: "1px solid #e6e6e6",
-                        background: "#fff",
-                        padding: 10,
-                      }}
-                    >
-                      <div style={{ fontWeight: 700 }}>
-                        {issue.title}{" "}
-                        <span style={{ fontWeight: 400, color: "#666" }}>
-                          ({issue.severity})
-                        </span>
-                      </div>
-                      <div style={{ fontSize: 13, marginTop: 4 }}>{issue.message}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ fontSize: 13, color: "#666" }}>No issues returned.</div>
-              )}
-            </div>
-
-            <div>
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>Suggestions</div>
-              {mockReview.suggestions?.length ? (
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {mockReview.suggestions.map((suggestion, index) => (
-                    <li key={`${suggestion}-${index}`} style={{ marginBottom: 4 }}>
-                      {suggestion}
-                    </li>
+            {exportCheck.warnings?.length === 0 ? (
+              <div className="case-review-ok">No major missing sections were detected.</div>
+            ) : (
+              <div className="case-review-block">
+                <div className="case-review-label">Warnings</div>
+                <ul className="case-list">
+                  {exportCheck.warnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
                   ))}
                 </ul>
-              ) : (
-                <div style={{ fontSize: 13, color: "#666" }}>No suggestions returned.</div>
-              )}
-            </div>
-          </>
+              </div>
+            )}
+          </div>
         )}
-      </div>
 
-      {error && (
-        <div
-          style={{
-            background: "#fee",
-            border: "1px solid #f99",
-            padding: 10,
-            marginTop: 12,
-          }}
-        >
-          {error}
+        <div className="case-review-card case-review-card-neutral">
+          <div className="case-review-header">
+            <h2 className="case-review-title">Mock legal review</h2>
+          </div>
+
+          {!mockReview ? (
+            <p className="case-review-copy">
+              Run a simulated legal review to generate demo feedback about missing terms,
+              fairness concerns, and clause quality.
+            </p>
+          ) : (
+            <div className="case-review-stack">
+              <div className="case-summary-box">
+                <span className="case-review-label">Summary</span>
+                <div>{mockReview.summary}</div>
+              </div>
+
+              <p className="case-review-copy">{mockReview.disclaimer}</p>
+
+              <div className="case-review-block">
+                <div className="case-review-label">Issues</div>
+                {mockReview.issues?.length ? (
+                  <div className="case-issue-list">
+                    {mockReview.issues.map((issue, index) => (
+                      <div key={`${issue.title}-${index}`} className="case-issue-card">
+                        <div className="case-issue-title">
+                          {issue.title}
+                          <span className="case-issue-severity">{issue.severity}</span>
+                        </div>
+                        <div className="case-issue-message">{issue.message}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="case-muted">No issues returned.</div>
+                )}
+              </div>
+
+              <div className="case-review-block">
+                <div className="case-review-label">Suggestions</div>
+                {mockReview.suggestions?.length ? (
+                  <ul className="case-list">
+                    {mockReview.suggestions.map((suggestion, index) => (
+                      <li key={`${suggestion}-${index}`}>{suggestion}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="case-muted">No suggestions returned.</div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </section>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "320px 1fr 360px",
-          gap: 16,
-          marginTop: 16,
-        }}
-      >
-        <div style={{ border: "1px solid #ddd", padding: 12 }}>
-          <h3 style={{ marginTop: 0 }}>Clauses</h3>
+      <section className="case-activity-grid">
+        <div className="case-panel case-activity-panel">
+          <div className="case-panel-header">
+            <div>
+              <h2 className="case-panel-title">Activity and notifications</h2>
+              <p className="case-panel-subtitle">
+                Track major case events, clause edits, approvals, rejections, and comments.
+              </p>
+            </div>
+          </div>
 
-          <form onSubmit={onCreateClause} style={{ display: "grid", gap: 8, marginBottom: 12 }}>
-            <select
-              value={selectedTemplateId}
-              onChange={(e) => onSelectTemplate(e.target.value)}
-              style={{ padding: 10 }}
-            >
-              <option value="">Custom Clause</option>
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.title} ({t.jurisdiction})
-                </option>
+          {auditEvents.length === 0 ? (
+            <div className="case-empty-card case-empty-card-tight">No activity recorded yet.</div>
+          ) : (
+            <div className="case-activity-list">
+              {auditEvents.slice(0, 8).map((event) => (
+                <div key={event._id} className="case-activity-card">
+                  <div className="case-activity-top">
+                    <strong>{event.title}</strong>
+                    <span>{new Date(event.createdAt).toLocaleString()}</span>
+                  </div>
+                  <div className="case-activity-message">{event.message}</div>
+                  <div className="case-activity-meta">
+                    {actorDisplay(event.userId)} · {event.type.replaceAll("_", " ")}
+                  </div>
+                </div>
               ))}
-            </select>
+            </div>
+          )}
+        </div>
+      </section>
 
-            <input
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              placeholder="New clause title"
-              style={{ padding: 10 }}
-            />
-            <input
-              value={newCategory}
-              onChange={(e) => setNewCategory(e.target.value)}
-              placeholder="Category"
-              style={{ padding: 10 }}
-            />
+      <section className="case-workspace">
+        <aside className="case-panel case-panel-left">
+          <div className="case-panel-header">
+            <div>
+              <h2 className="case-panel-title">Clauses</h2>
+              <p className="case-panel-subtitle">
+                Create a custom clause or generate a draft from a jurisdiction template.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={onCreateClause} className="case-form">
+            <label className="case-field">
+              <span className="case-label">Template</span>
+              <select
+                value={selectedTemplateId}
+                onChange={(e) => onSelectTemplate(e.target.value)}
+                className="case-select"
+              >
+                <option value="">Custom Clause</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title} ({t.jurisdiction})
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="case-field">
+              <span className="case-label">Clause title</span>
+              <input
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                placeholder="New clause title"
+                className="case-input"
+              />
+            </label>
+
+            <label className="case-field">
+              <span className="case-label">Category</span>
+              <input
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                placeholder="Category"
+                className="case-input"
+              />
+            </label>
 
             {templateDetails && (
-              <div
-                style={{
-                  border: "1px solid #e6e6e6",
-                  background: "#fafafa",
-                  padding: 10,
-                  display: "grid",
-                  gap: 8,
-                }}
-              >
-                <div style={{ fontWeight: 700 }}>{templateDetails.title}</div>
-                <div style={{ fontSize: 12, color: "#666" }}>
-                  {templateDetails.description}
-                </div>
-                <div style={{ fontSize: 12 }}>
-                  Review Status: <b>{templateDetails.reviewStatus || "UNKNOWN"}</b>
-                </div>
-                <div style={{ fontSize: 12 }}>
-                  Reviewed By: <b>{templateDetails.reviewedBy || "Not specified"}</b>
-                </div>
-                <div style={{ fontSize: 12 }}>
-                  Reviewed On: <b>{templateDetails.reviewedOn || "Not yet reviewed"}</b>
-                </div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "#7a4d00",
-                    background: "#fff6df",
-                    border: "1px solid #f0d58a",
-                    padding: 8,
-                  }}
-                >
-                  {templateDetails.disclaimer}
+              <div className="case-template-box">
+                <div className="case-template-head">
+                  <div className="case-template-title">{templateDetails.title}</div>
+                  <span className="case-template-chip">
+                    {templateDetails.jurisdiction || "General"}
+                  </span>
                 </div>
 
+                <div className="case-template-description">{templateDetails.description}</div>
+
+                <div className="case-template-meta-grid">
+                  <div className="case-template-meta-item">
+                    <span className="case-template-meta-label">Review status</span>
+                    <span>{templateDetails.reviewStatus || "UNKNOWN"}</span>
+                  </div>
+                  <div className="case-template-meta-item">
+                    <span className="case-template-meta-label">Reviewed by</span>
+                    <span>{templateDetails.reviewedBy || "Not specified"}</span>
+                  </div>
+                  <div className="case-template-meta-item">
+                    <span className="case-template-meta-label">Reviewed on</span>
+                    <span>{templateDetails.reviewedOn || "Not yet reviewed"}</span>
+                  </div>
+                </div>
+
+                <div className="case-template-disclaimer">{templateDetails.disclaimer}</div>
+
                 {(templateDetails.placeholders || []).map((field) => (
-                  <div key={field.key} style={{ display: "grid", gap: 4 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600 }}>
+                  <label key={field.key} className="case-field">
+                    <span className="case-label">
                       {field.label}
                       {field.required ? " *" : ""}
-                    </label>
+                    </span>
 
                     {field.type === "textarea" ? (
                       <textarea
@@ -633,38 +1018,41 @@ export default function CasePage() {
                         onChange={(e) => onTemplateValueChange(field.key, e.target.value)}
                         placeholder={field.placeholder || ""}
                         rows={4}
-                        style={{ padding: 8, resize: "vertical" }}
+                        className="case-textarea"
                       />
                     ) : (
                       <input
                         value={templateValues[field.key] || ""}
                         onChange={(e) => onTemplateValueChange(field.key, e.target.value)}
                         placeholder={field.placeholder || ""}
-                        style={{ padding: 8 }}
+                        className="case-input"
                       />
                     )}
-                  </div>
+                  </label>
                 ))}
 
                 <button
                   type="button"
                   onClick={onGenerateFromTemplate}
                   disabled={busy}
-                  style={{ padding: 10 }}
+                  className="case-button case-button-secondary case-button-full"
                 >
-                  Generate Draft from Template
+                  Generate draft from template
                 </button>
               </div>
             )}
 
-            <button disabled={busy || !newTitle.trim()} style={{ padding: 10 }}>
-              Add Clause
+            <button
+              disabled={busy || !newTitle.trim()}
+              className="case-button case-button-primary case-button-full"
+            >
+              Add clause
             </button>
           </form>
 
-          <div style={{ display: "grid", gap: 8 }}>
+          <div className="case-clause-list">
             {clauses.length === 0 ? (
-              <div style={{ color: "#666" }}>No clauses yet.</div>
+              <div className="case-empty-card">No clauses yet.</div>
             ) : (
               clauses
                 .slice()
@@ -681,37 +1069,53 @@ export default function CasePage() {
                   return (
                     <button
                       key={c._id}
+                      type="button"
                       onClick={() => setSelectedClauseId(c._id)}
-                      style={{
-                        textAlign: "left",
-                        padding: 10,
-                        border: "1px solid #eee",
-                        background: isSelected ? "#f2f6ff" : "#fff",
-                        cursor: "pointer",
-                      }}
+                      className={`case-clause-card ${isSelected ? "case-clause-card-selected" : ""}`}
                     >
-                      <div style={{ fontWeight: 700 }}>{c.title}</div>
-                      <div style={{ fontSize: 12, color: "#666" }}>{c.category}</div>
+                      <div className="case-clause-top">
+                        <div>
+                          <div className="case-clause-title">{c.title}</div>
+                          <div className="case-clause-category">{c.category}</div>
+                        </div>
+
+                        <span
+                          className={`case-clause-state case-clause-state--${clauseOverallTone(
+                            s
+                          )}`}
+                        >
+                          {clauseOverallLabel(s)}
+                        </span>
+                      </div>
+
                       {c.templateTitle && (
-                        <div style={{ fontSize: 11, color: "#666", marginTop: 4 }}>
-                          Template: <b>{c.templateTitle}</b>
+                        <div className="case-clause-template">
+                          Template: <strong>{c.templateTitle}</strong>
                         </div>
                       )}
+
+                      <div className="case-clause-review-row">
+                        <span
+                          className={`case-review-chip case-review-chip--${reviewTone(
+                            c.templateReviewStatus
+                          )}`}
+                        >
+                          Template: {reviewLabel(c.templateReviewStatus)}
+                        </span>
+
+                        <span
+                          className={`case-review-chip case-review-chip--${reviewTone(
+                            c.adminReviewStatus
+                          )}`}
+                        >
+                          Moderator: {reviewLabel(c.adminReviewStatus)}
+                        </span>
+                      </div>
+
                       {s && (
-                        <div style={{ fontSize: 12, marginTop: 6 }}>
-                          <span>
-                            Party A: {partyARejected ? "❌" : partyAApproved ? "✅" : "—"}
-                          </span>
-                          <span style={{ marginLeft: 8 }}>
-                            Party B: {partyBRejected ? "❌" : partyBApproved ? "✅" : "—"}
-                          </span>
-                          <span style={{ marginLeft: 8 }}>
-                            {s.overallState === "REJECTED"
-                              ? "❌ Rejected"
-                              : s.isApprovedByBoth
-                              ? "✅ Approved"
-                              : "⏳ Pending"}
-                          </span>
+                        <div className="case-clause-actors">
+                          <span>Party A: {actorMark(partyAApproved, partyARejected)}</span>
+                          <span>Party B: {actorMark(partyBApproved, partyBRejected)}</span>
                         </div>
                       )}
                     </button>
@@ -719,162 +1123,263 @@ export default function CasePage() {
                 })
             )}
           </div>
-        </div>
+        </aside>
 
-        <div style={{ border: "1px solid #ddd", padding: 12 }}>
-          <h3 style={{ marginTop: 0 }}>Editor</h3>
+        <main className="case-panel case-panel-editor">
+          <div className="case-panel-header">
+            <div>
+              <h2 className="case-panel-title">Editor</h2>
+              <p className="case-panel-subtitle">
+                Review the selected clause, revise its wording, and record approval decisions.
+              </p>
+            </div>
+          </div>
 
           {!selectedClause ? (
-            <div style={{ color: "#666" }}>Select a clause to edit.</div>
+            <div className="case-empty-card">Select a clause to edit.</div>
           ) : (
             <>
-              <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>
-                Editing: <b>{selectedClause.title}</b>
+              <div className="case-editor-summary">
+                <div className="case-editor-summary-main">
+                  <div className="case-editor-label">Editing clause</div>
+                  <div className="case-editor-title">{selectedClause.title}</div>
+                </div>
+
+                <span
+                  className={`case-clause-state case-clause-state--${clauseOverallTone(
+                    statusForClause(selectedClause._id)
+                  )}`}
+                >
+                  {clauseOverallLabel(statusForClause(selectedClause._id))}
+                </span>
               </div>
 
-              {selectedClause.templateId && (
-                <div
-                  style={{
-                    border: "1px solid #e6e6e6",
-                    background: "#fafafa",
-                    padding: 10,
-                    display: "grid",
-                    gap: 8,
-                    marginBottom: 12,
-                  }}
-                >
-                  <div style={{ fontWeight: 700 }}>Template Source</div>
-                  <div style={{ fontSize: 12 }}>
-                    Template: <b>{selectedClause.templateTitle || "Unknown template"}</b>
-                  </div>
-                  <div style={{ fontSize: 12 }}>
-                    Jurisdiction: <b>{selectedClause.templateJurisdiction || "Unknown"}</b>
-                  </div>
-                  <div style={{ fontSize: 12 }}>
-                    Review Status: <b>{selectedClause.templateReviewStatus || "UNKNOWN"}</b>
-                  </div>
-                  <div style={{ fontSize: 12 }}>
-                    Reviewed By: <b>{selectedClause.templateReviewedBy || "Not specified"}</b>
-                  </div>
-                  <div style={{ fontSize: 12 }}>
-                    Reviewed On: <b>{selectedClause.templateReviewedOn || "Not yet reviewed"}</b>
-                  </div>
-                  {selectedClause.templateDisclaimer && (
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "#7a4d00",
-                        background: "#fff6df",
-                        border: "1px solid #f0d58a",
-                        padding: 8,
-                      }}
+              <div className="case-review-panel">
+                {selectedClause.templateId && (
+                  <details className="case-review-dropdown">
+                    <summary className="case-review-dropdown-summary">
+                      <span className="case-review-dropdown-title">Template source review</span>
+                      <span
+                        className={`case-review-chip case-review-chip--${reviewTone(
+                          selectedClause.templateReviewStatus
+                        )}`}
+                      >
+                        {reviewLabel(selectedClause.templateReviewStatus)}
+                      </span>
+                    </summary>
+
+                    <div className="case-review-dropdown-body">
+                      <div className="case-template-meta-grid">
+                        <div className="case-template-meta-item">
+                          <span className="case-template-meta-label">Template</span>
+                          <span>{selectedClause.templateTitle || "Unknown template"}</span>
+                        </div>
+                        <div className="case-template-meta-item">
+                          <span className="case-template-meta-label">Jurisdiction</span>
+                          <span>{selectedClause.templateJurisdiction || "Unknown"}</span>
+                        </div>
+                        <div className="case-template-meta-item">
+                          <span className="case-template-meta-label">Reviewed by</span>
+                          <span>{reviewPerson(selectedClause.templateReviewedBy)}</span>
+                        </div>
+                        <div className="case-template-meta-item">
+                          <span className="case-template-meta-label">Reviewed on</span>
+                          <span>
+                            {selectedClause.templateReviewedOn
+                              ? new Date(selectedClause.templateReviewedOn).toLocaleString()
+                              : "Not reviewed"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="case-template-disclaimer">
+                        {selectedClause.templateDisclaimer || "No template review note."}
+                      </div>
+                    </div>
+                  </details>
+                )}
+
+                <details className="case-review-dropdown">
+                  <summary className="case-review-dropdown-summary">
+                    <span className="case-review-dropdown-title">Legal moderator review</span>
+                    <span
+                      className={`case-review-chip case-review-chip--${reviewTone(
+                        selectedClause.adminReviewStatus
+                      )}`}
                     >
-                      {selectedClause.templateDisclaimer}
+                      {reviewLabel(selectedClause.adminReviewStatus)}
+                    </span>
+                  </summary>
+
+                  <div className="case-review-dropdown-body">
+                    <div className="case-template-meta-grid">
+                      <div className="case-template-meta-item">
+                        <span className="case-template-meta-label">Reviewed by</span>
+                        <span>{reviewPerson(selectedClause.adminReviewedBy)}</span>
+                      </div>
+                      <div className="case-template-meta-item">
+                        <span className="case-template-meta-label">Reviewed on</span>
+                        <span>
+                          {selectedClause.adminReviewedAt
+                            ? new Date(selectedClause.adminReviewedAt).toLocaleString()
+                            : "Not reviewed"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="case-template-disclaimer">
+                      {selectedClause.adminReviewNote || "No moderator note yet."}
+                    </div>
+                  </div>
+                </details>
+              </div>
+
+              <details className="case-review-dropdown case-version-history">
+                <summary className="case-review-dropdown-summary">
+                  <span className="case-review-dropdown-title">Clause version history</span>
+                  <span className="case-review-chip case-review-chip--default">
+                    {clauseVersions.length} versions
+                  </span>
+                </summary>
+
+                <div className="case-review-dropdown-body">
+                  {clauseVersions.length === 0 ? (
+                    <div className="case-muted">No edits have been saved for this clause yet.</div>
+                  ) : (
+                    <div className="case-version-list">
+                      {clauseVersions.map((version) => (
+                        <div key={version._id} className="case-version-card">
+                          <div className="case-version-header">
+                            <strong>Version {version.versionNumber}</strong>
+                            <span>{new Date(version.createdAt).toLocaleString()}</span>
+                          </div>
+                          <div className="case-version-meta">
+                            Edited by {actorDisplay(version.editedBy)} · approvals reset
+                          </div>
+                          <div className="case-version-diff">
+                            <div>
+                              <span className="case-version-label">Previous</span>
+                              <p>{version.previousContent || "No previous content."}</p>
+                            </div>
+                            <div>
+                              <span className="case-version-label">Updated</span>
+                              <p>{version.newContent || "No updated content."}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
-              )}
+              </details>
 
               <textarea
                 value={draftContent}
                 onChange={(e) => setDraftContent(e.target.value)}
-                style={{ width: "95%", height: 320, padding: 10, fontFamily: "inherit" }}
+                className="case-textarea case-editor-textarea"
                 placeholder="Write the clause text here..."
               />
 
-              <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-                <button onClick={onSaveClause} disabled={busy} style={{ padding: "8px 12px" }}>
+              <div className="case-editor-actions">
+                <button
+                  type="button"
+                  onClick={onSaveClause}
+                  disabled={busy}
+                  className="case-button case-button-secondary"
+                >
                   Save
                 </button>
-                <button onClick={onApprove} disabled={busy} style={{ padding: "8px 12px" }}>
+                <button
+                  type="button"
+                  onClick={onApprove}
+                  disabled={busy}
+                  className="case-button case-button-primary"
+                >
                   Approve
                 </button>
-                <button onClick={openRejectModal} disabled={busy} style={{ padding: "8px 12px" }}>
+                <button
+                  type="button"
+                  onClick={openRejectModal}
+                  disabled={busy}
+                  className="case-button case-button-danger"
+                >
                   Reject
                 </button>
               </div>
 
-              <div style={{ fontSize: 12, color: "#666", marginTop: 10 }}>
-                Tip: Rejecting a clause requires a written reason.
+              <div className="case-help-note">
+                Rejecting a clause requires a written reason.
               </div>
             </>
           )}
-        </div>
+        </main>
 
-        <div style={{ border: "1px solid #ddd", padding: 12 }}>
-          <h3 style={{ marginTop: 0 }}>Comments</h3>
+        <aside className="case-panel case-panel-comments">
+          <div className="case-panel-header">
+            <div>
+              <h2 className="case-panel-title">Comments</h2>
+              <p className="case-panel-subtitle">
+                Track feedback and discussion for the selected clause.
+              </p>
+            </div>
+          </div>
 
           {!selectedClause ? (
-            <div style={{ color: "#666" }}>Select a clause to view comments.</div>
+            <div className="case-empty-card">Select a clause to view comments.</div>
           ) : (
             <>
-              <div style={{ maxHeight: 320, overflow: "auto", border: "1px solid #eee", padding: 10 }}>
+              <div className="case-comments-list">
                 {comments.length === 0 ? (
-                  <div style={{ color: "#666" }}>No comments yet.</div>
+                  <div className="case-empty-card case-empty-card-tight">No comments yet.</div>
                 ) : (
                   comments.map((c) => (
-                    <div key={c._id} style={{ padding: "8px 0", borderBottom: "1px solid #f2f2f2" }}>
-                      <div style={{ fontSize: 12, color: "#777" }}>
-                        User:{" "}
-                        <code>
+                    <div key={c._id} className="case-comment-card">
+                      <div className="case-comment-top">
+                        <div className="case-comment-user">
                           {typeof c.userId === "object"
                             ? c.userId.email || c.userId.name || "User"
                             : c.userId}
-                        </code>
+                        </div>
+                        <div className="case-comment-time">
+                          {new Date(c.createdAt).toLocaleString()}
+                        </div>
                       </div>
-                      <div>{c.message}</div>
-                      <div style={{ fontSize: 11, color: "#999" }}>
-                        {new Date(c.createdAt).toLocaleString()}
-                      </div>
+                      <div className="case-comment-message">{c.message}</div>
                     </div>
                   ))
                 )}
               </div>
 
-              <form onSubmit={onAddComment} style={{ display: "grid", gap: 8, marginTop: 10 }}>
-                <input
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  placeholder="Add a comment..."
-                  style={{ padding: 10 }}
-                />
-                <button disabled={busy || !commentText.trim()} style={{ padding: 10 }}>
-                  Add Comment
+              <form onSubmit={onAddComment} className="case-comment-form">
+                <label className="case-field">
+                  <span className="case-label">Add comment</span>
+                  <input
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    placeholder="Add a comment..."
+                    className="case-input"
+                  />
+                </label>
+
+                <button
+                  disabled={busy || !commentText.trim()}
+                  className="case-button case-button-secondary case-button-full"
+                >
+                  Add comment
                 </button>
               </form>
             </>
           )}
-        </div>
-      </div>
+        </aside>
+      </section>
 
       {rejectModalOpen && (
-        <div
-          onClick={closeRejectModal}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.45)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-            zIndex: 1000,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "100%",
-              maxWidth: 520,
-              background: "#fff",
-              borderRadius: 10,
-              padding: 16,
-              boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
-            }}
-          >
-            <h3 style={{ marginTop: 0 }}>Reject Clause</h3>
-            <p style={{ color: "#555" }}>
-              Enter the reason for rejecting this clause.
+        <div onClick={closeRejectModal} className="case-modal-backdrop">
+          <div onClick={(e) => e.stopPropagation()} className="case-modal-card">
+            <h3 className="case-modal-title">Reject clause</h3>
+            <p className="case-modal-copy">
+              Enter the reason for rejecting this clause. This feedback will be saved as part
+              of the clause discussion.
             </p>
 
             <textarea
@@ -882,23 +1387,25 @@ export default function CasePage() {
               onChange={(e) => setRejectReason(e.target.value)}
               rows={5}
               placeholder="Explain what needs to change..."
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                padding: 10,
-                border: "1px solid #ccc",
-                borderRadius: 6,
-                resize: "vertical",
-                marginBottom: 12,
-              }}
+              className="case-textarea"
             />
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-              <button type="button" onClick={closeRejectModal} disabled={busy}>
+            <div className="case-modal-actions">
+              <button
+                type="button"
+                onClick={closeRejectModal}
+                disabled={busy}
+                className="case-button case-button-secondary"
+              >
                 Cancel
               </button>
-              <button type="button" onClick={onRejectConfirm} disabled={busy}>
-                {busy ? "Submitting..." : "Submit Rejection"}
+              <button
+                type="button"
+                onClick={onRejectConfirm}
+                disabled={busy}
+                className="case-button case-button-danger"
+              >
+                {busy ? "Submitting..." : "Submit rejection"}
               </button>
             </div>
           </div>
