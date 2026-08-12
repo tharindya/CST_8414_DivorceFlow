@@ -3,7 +3,7 @@ const ClauseAction = require("../models/ClauseAction");
 const ClauseVersion = require("../models/ClauseVersion");
 const { recomputeCaseStatus } = require("./approval.controller");
 const { recordAuditLog } = require("../services/audit.service");
-const { rewriteClause } = require("../services/clauseRewrite.service");
+const { requestClauseRewrite } = require("../services/aiClauseRewrite.service");
 
 async function listClauses(req, res, next) {
   try {
@@ -188,14 +188,16 @@ async function previewClauseRewrite(req, res, next) {
     const mode = String(req.body.mode || "CLEAR").toUpperCase();
     const sourceContent =
       typeof req.body.content === "string" ? req.body.content : clause.contentCurrent;
-    const rewrittenContent = rewriteClause(sourceContent, mode);
+    const result = await requestClauseRewrite({ content: sourceContent, mode });
 
     res.json({
       clauseId: clause._id,
       mode,
       originalContent: sourceContent,
-      rewrittenContent,
-      changed: rewrittenContent !== sourceContent,
+      rewrittenContent: result.rewrittenContent,
+      changed: result.rewrittenContent !== sourceContent,
+      provider: "Gemini",
+      model: result.model,
       disclaimer:
         "This AI-assisted rewrite is a drafting preview. Review it before saving and do not treat it as legal advice.",
     });
