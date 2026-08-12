@@ -3,6 +3,7 @@ const ClauseAction = require("../models/ClauseAction");
 const ClauseVersion = require("../models/ClauseVersion");
 const { recomputeCaseStatus } = require("./approval.controller");
 const { recordAuditLog } = require("../services/audit.service");
+const { rewriteClause } = require("../services/clauseRewrite.service");
 
 async function listClauses(req, res, next) {
   try {
@@ -177,4 +178,30 @@ async function updateClause(req, res, next) {
   }
 }
 
-module.exports = { listClauses, createClause, updateClause };
+async function previewClauseRewrite(req, res, next) {
+  try {
+    const clause = await Clause.findById(req.params.clauseId).select(
+      "_id caseId title contentCurrent"
+    );
+    if (!clause) return res.status(404).json({ error: "Clause not found" });
+
+    const mode = String(req.body.mode || "CLEAR").toUpperCase();
+    const sourceContent =
+      typeof req.body.content === "string" ? req.body.content : clause.contentCurrent;
+    const rewrittenContent = rewriteClause(sourceContent, mode);
+
+    res.json({
+      clauseId: clause._id,
+      mode,
+      originalContent: sourceContent,
+      rewrittenContent,
+      changed: rewrittenContent !== sourceContent,
+      disclaimer:
+        "This AI-assisted rewrite is a drafting preview. Review it before saving and do not treat it as legal advice.",
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { listClauses, createClause, updateClause, previewClauseRewrite };
