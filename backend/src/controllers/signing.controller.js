@@ -1,6 +1,7 @@
 const Case = require("../models/Case");
 const { loadFinalReview } = require("../services/finalReview.service");
 const { recordAuditLog } = require("../services/audit.service");
+const { applyFinalConfirmation } = require("../services/signing.service");
 
 async function confirmFinalReview(req, res, next) {
   try {
@@ -20,36 +21,14 @@ async function confirmFinalReview(req, res, next) {
     }
 
     const caseDoc = await Case.findById(caseId);
-    const participant = caseDoc.participants.find(
-      (item) => String(item.userId) === String(req.user.id)
-    );
-    if (!participant) {
-      return res.status(403).json({ error: "Only case participants can confirm final review" });
-    }
-
-    const validRoles = new Set(
+    const validRoles =
       review.signing.confirmations
         .filter((confirmation) => confirmation.confirmed)
-        .map((confirmation) => confirmation.role)
-    );
-    caseDoc.finalConfirmations = (caseDoc.finalConfirmations || []).filter(
-      (confirmation) =>
-        validRoles.has(confirmation.role) && confirmation.role !== participant.role
-    );
-    caseDoc.finalConfirmations.push({
-      role: participant.role,
+        .map((confirmation) => confirmation.role);
+    const { participant, finalized } = applyFinalConfirmation(caseDoc, {
       userId: req.user.id,
-      confirmedAt: new Date(),
+      validRoles,
     });
-
-    const confirmedRoles = new Set(
-      caseDoc.finalConfirmations.map((confirmation) => confirmation.role)
-    );
-    const finalized = confirmedRoles.has("PARTY_A") && confirmedRoles.has("PARTY_B");
-    if (finalized) {
-      caseDoc.status = "FINALIZED";
-      caseDoc.finalizedAt = new Date();
-    }
     await caseDoc.save();
 
     await recordAuditLog({

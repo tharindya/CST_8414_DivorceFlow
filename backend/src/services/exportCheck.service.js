@@ -154,7 +154,7 @@ function buildExportCheck(caseDoc, clauses) {
   return {
     jurisdiction: caseDoc?.jurisdiction || "General",
     caseStatus: caseDoc?.status || "DRAFT",
-    caseStatusAllowsExport: caseDoc?.status === "READY",
+    caseStatusAllowsExport: ["READY", "FINALIZED", "EXPORTED"].includes(caseDoc?.status),
     completenessOk: missingCategories.length === 0,
     missingCategories,
     warnings,
