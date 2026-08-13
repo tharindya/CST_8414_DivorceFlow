@@ -67,7 +67,9 @@ function buildFinalReview({ caseDoc, clauses, actions, exportCheck, latestAiRevi
   const aiReviewCurrent = Boolean(latestAiReview && aiReviewTime >= latestDraftChange);
 
   const blockers = [];
+  const warnings = [];
   const addBlocker = (code, title, message) => blockers.push({ code, title, message });
+  const addWarning = (code, title, message) => warnings.push({ code, title, message });
 
   if (!participantRoles.has("PARTY_A") || !participantRoles.has("PARTY_B")) {
     addBlocker("PARTIES", "Both parties must join", "Party A and Party B must both participate before final review.");
@@ -104,10 +106,10 @@ function buildFinalReview({ caseDoc, clauses, actions, exportCheck, latestAiRevi
   } else if (!aiReviewCurrent) {
     addBlocker("AI_REVIEW_STALE", "AI agreement review is outdated", "Run the AI agreement review again after the latest drafting changes.");
   } else if (latestAiReview.readiness !== "READY_FOR_HUMAN_REVIEW") {
-    addBlocker(
+    addWarning(
       "AI_REVIEW_RESULT",
       "AI review found drafting issues",
-      `Latest result: ${latestAiReview.readiness || "UNKNOWN"}; ${(latestAiReview.issues || []).length} issue(s).`
+      `Latest result: ${latestAiReview.readiness || "UNKNOWN"}; ${(latestAiReview.issues || []).length} issue(s). AI findings are advisory and do not prevent export after moderator review.`
     );
   }
 
@@ -133,6 +135,7 @@ function buildFinalReview({ caseDoc, clauses, actions, exportCheck, latestAiRevi
       moderatorReviewedCount,
     },
     blockers,
+    warnings,
     clauses: clauseRows,
     completeness: exportCheck,
     latestAiReview: latestAiReview

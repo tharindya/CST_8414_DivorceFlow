@@ -48,7 +48,22 @@ test("buildFinalReview marks a fully reviewed agreement ready for signing", () =
   assert.equal(review.canExport, true);
   assert.equal(review.readiness, "READY_FOR_SIGNING");
   assert.equal(review.blockers.length, 0);
+  assert.equal(review.warnings.length, 0);
   assert.equal(review.clauses[0].overallStatus, "APPROVED");
+});
+
+test("buildFinalReview treats current AI findings as advisory after moderator review", () => {
+  const fixture = completeFixture();
+  fixture.latestAiReview.readiness = "REVIEW_REQUIRED";
+  fixture.latestAiReview.issues = [{ severity: "HIGH" }];
+
+  const review = buildFinalReview(fixture);
+
+  assert.equal(review.readyForSigning, true);
+  assert.equal(review.canExport, true);
+  assert.equal(review.blockers.length, 0);
+  assert.equal(review.warnings.length, 1);
+  assert.equal(review.warnings[0].code, "AI_REVIEW_RESULT");
 });
 
 test("buildFinalReview reports actionable blockers", () => {
@@ -75,5 +90,6 @@ test("buildFinalReview reports actionable blockers", () => {
   assert.ok(blockerCodes.includes("APPROVALS"));
   assert.ok(blockerCodes.includes("MODERATOR_REVISION"));
   assert.ok(blockerCodes.includes("COMPLETENESS"));
-  assert.ok(blockerCodes.includes("AI_REVIEW_RESULT"));
+  assert.equal(review.warnings.length, 1);
+  assert.equal(review.warnings[0].code, "AI_REVIEW_RESULT");
 });

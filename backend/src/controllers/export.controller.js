@@ -3,6 +3,7 @@ const Clause = require("../models/Clause");
 const User = require("../models/User");
 const { buildAgreementPdf } = require("../services/export.service");
 const { buildExportCheck } = require("../services/exportCheck.service");
+const { loadFinalReview } = require("../services/finalReview.service");
 
 async function getExportCheck(req, res, next) {
   try {
@@ -33,8 +34,12 @@ async function exportCasePdf(req, res, next) {
       return res.status(404).json({ error: "Case not found" });
     }
 
-    if (caseDoc.status !== "READY") {
-      return res.status(400).json({ error: "Case must be READY before export" });
+    const finalReview = await loadFinalReview(caseId);
+    if (!finalReview?.canExport) {
+      return res.status(400).json({
+        error: "Agreement has unresolved signing-readiness blockers",
+        blockers: finalReview?.blockers || [],
+      });
     }
 
     const clauses = await Clause.find({ caseId })
