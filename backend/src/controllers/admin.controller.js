@@ -4,6 +4,15 @@ const Comment = require("../models/Comment");
 const ClauseAction = require("../models/ClauseAction");
 const TemplateReview = require("../models/TemplateReview");
 const { clauseTemplates } = require("../data/clauseTemplates");
+const { loadAdminAnalytics } = require("../services/adminAnalytics.service");
+
+async function getAdminAnalytics(req, res, next) {
+  try {
+    res.json(await loadAdminAnalytics());
+  } catch (err) {
+    next(err);
+  }
+}
 
 async function listAllCases(req, res, next) {
   try {
@@ -267,6 +276,7 @@ async function updateAdminClauseReview(req, res, next) {
 }
 
 module.exports = {
+  getAdminAnalytics,
   listAllCases,
   getAdminCaseById,
   listAdminTemplates,
