@@ -4,7 +4,7 @@ const ClauseAction = require("../models/ClauseAction");
 const AiAgreementReview = require("../models/AiAgreementReview");
 const { buildExportCheck } = require("./exportCheck.service");
 
-function buildFinalReview({ caseDoc, clauses, actions, exportCheck, latestAiReview }) {
+function buildFinalReview({ caseDoc, clauses, actions, exportCheck, latestAiReview, currentUserId = null }) {
   const participants = caseDoc?.participants || [];
   const participantRoles = new Set(participants.map((participant) => participant.role));
   const latestByClauseAndUser = new Map();
@@ -114,6 +114,33 @@ function buildFinalReview({ caseDoc, clauses, actions, exportCheck, latestAiRevi
   }
 
   const readyForSigning = blockers.length === 0;
+  const currentConfirmations = (caseDoc?.finalConfirmations || []).filter((confirmation) => {
+    const confirmedAt = confirmation.confirmedAt
+      ? new Date(confirmation.confirmedAt).getTime()
+      : 0;
+    return confirmedAt >= latestDraftChange;
+  });
+  const confirmationByRole = new Map(
+    currentConfirmations.map((confirmation) => [confirmation.role, confirmation])
+  );
+  const currentParticipant = participants.find(
+    (participant) => String(participant.userId) === String(currentUserId)
+  );
+  const confirmedCount = ["PARTY_A", "PARTY_B"].filter((role) =>
+    confirmationByRole.has(role)
+  ).length;
+  const bothConfirmed = confirmedCount === 2;
+  const finalized = caseDoc?.status === "FINALIZED" && bothConfirmed;
+  const currentUserConfirmed = currentParticipant
+    ? confirmationByRole.has(currentParticipant.role)
+    : false;
+  const readiness = finalized
+    ? "FINALIZED"
+    : readyForSigning && confirmedCount > 0
+      ? "SIGNING_IN_PROGRESS"
+      : readyForSigning
+        ? "READY_FOR_SIGNING"
+        : "NOT_READY";
 
   return {
     case: {
@@ -122,9 +149,10 @@ function buildFinalReview({ caseDoc, clauses, actions, exportCheck, latestAiRevi
       jurisdiction: caseDoc?.jurisdiction || "General",
       workflowStatus: caseDoc?.status || "DRAFT",
     },
-    readiness: readyForSigning ? "READY_FOR_SIGNING" : "NOT_READY",
+    readiness,
     readyForSigning,
-    canExport: readyForSigning && caseDoc?.status === "READY",
+    canExport:
+      readyForSigning && ["READY", "FINALIZED", "EXPORTED"].includes(caseDoc?.status),
     summary: {
       partyCount: participants.length,
       intakeComplete: Boolean(caseDoc?.intake?.completed),
@@ -148,12 +176,34 @@ function buildFinalReview({ caseDoc, clauses, actions, exportCheck, latestAiRevi
           current: aiReviewCurrent,
         }
       : null,
+    signing: {
+      confirmedCount,
+      bothConfirmed,
+      finalized,
+      finalizedAt: finalized ? caseDoc?.finalizedAt || null : null,
+      currentUserRole: currentParticipant?.role || null,
+      currentUserConfirmed,
+      canConfirm:
+        readyForSigning &&
+        caseDoc?.status === "READY" &&
+        Boolean(currentParticipant) &&
+        !currentUserConfirmed,
+      confirmations: ["PARTY_A", "PARTY_B"].map((role) => {
+        const confirmation = confirmationByRole.get(role);
+        return {
+          role,
+          confirmed: Boolean(confirmation),
+          userId: confirmation?.userId || null,
+          confirmedAt: confirmation?.confirmedAt || null,
+        };
+      }),
+    },
     disclaimer:
       "Signing readiness confirms completion of the DivorceFlow workflow only. It does not determine legal validity or replace independent legal advice.",
   };
 }
 
-async function loadFinalReview(caseId) {
+async function loadFinalReview(caseId, currentUserId = null) {
   const caseDoc = await Case.findById(caseId).lean();
   if (!caseDoc) return null;
 
@@ -168,6 +218,7 @@ async function loadFinalReview(caseId) {
     clauses,
     actions,
     latestAiReview,
+    currentUserId,
     exportCheck: buildExportCheck(caseDoc, clauses),
   });
 }

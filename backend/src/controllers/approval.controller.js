@@ -3,10 +3,30 @@ const Clause = require("../models/Clause");
 const Case = require("../models/Case");
 const Comment = require("../models/Comment");
 const { recordAuditLog } = require("../services/audit.service");
+const { clearFinalConfirmations } = require("../services/signing.service");
+
+async function ensureCaseIsNotFinalized(caseId) {
+  const caseDoc = await Case.findById(caseId).select("status");
+  return caseDoc?.status !== "FINALIZED";
+}
+
+async function auditConfirmationReset({ caseId, clauseId, userId, confirmationsReset }) {
+  if (!confirmationsReset) return;
+  await recordAuditLog({
+    caseId,
+    clauseId,
+    userId,
+    type: "SIGNING_CONFIRMATIONS_RESET",
+    title: "Final confirmations reset",
+    message: "Clause approval activity changed, so both parties must confirm final review again.",
+    metadata: { confirmationsReset },
+  });
+}
 
 async function recomputeCaseStatus(caseId) {
   const caseDoc = await Case.findById(caseId).select("participants status");
   if (!caseDoc) return;
+  if (caseDoc.status === "FINALIZED") return;
 
   const participantIds = caseDoc.participants.map((p) => p.userId.toString());
 
@@ -68,6 +88,12 @@ async function approveClause(req, res, next) {
       return res.status(404).json({ error: "Clause not found" });
     }
 
+    if (!(await ensureCaseIsNotFinalized(clause.caseId))) {
+      return res.status(409).json({ error: "Finalized agreements cannot receive new approval actions" });
+    }
+
+    const confirmationsReset = await clearFinalConfirmations(clause.caseId);
+
     const action = await ClauseAction.create({
       clauseId,
       caseId: clause.caseId,
@@ -84,6 +110,13 @@ async function approveClause(req, res, next) {
       type: "CLAUSE_APPROVED",
       title: `Clause approved: ${clause.title}`,
       message: `${clause.title} was approved by a party.`,
+    });
+
+    await auditConfirmationReset({
+      caseId: clause.caseId,
+      clauseId,
+      userId: req.user.id,
+      confirmationsReset,
     });
 
     res.status(201).json({ action });
@@ -105,6 +138,12 @@ async function rejectClause(req, res, next) {
     if (!clause) {
       return res.status(404).json({ error: "Clause not found" });
     }
+
+    if (!(await ensureCaseIsNotFinalized(clause.caseId))) {
+      return res.status(409).json({ error: "Finalized agreements cannot receive new rejection actions" });
+    }
+
+    const confirmationsReset = await clearFinalConfirmations(clause.caseId);
 
     const action = await ClauseAction.create({
       clauseId,
@@ -130,6 +169,13 @@ async function rejectClause(req, res, next) {
       title: `Clause rejected: ${clause.title}`,
       message: `${clause.title} was rejected with feedback.`,
       metadata: { reason: comment.trim() },
+    });
+
+    await auditConfirmationReset({
+      caseId: clause.caseId,
+      clauseId,
+      userId: req.user.id,
+      confirmationsReset,
     });
 
     res.status(201).json({ action });

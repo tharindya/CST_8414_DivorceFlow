@@ -20,6 +20,9 @@ const auditLogSchema = new mongoose.Schema(
         "COMMENT_ADDED",
         "MESSAGE_SENT",
         "AI_AGREEMENT_REVIEW",
+        "FINAL_REVIEW_CONFIRMED",
+        "SIGNING_CONFIRMATIONS_RESET",
+        "CASE_FINALIZED",
       ],
     },
 

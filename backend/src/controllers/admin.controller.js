@@ -5,6 +5,9 @@ const ClauseAction = require("../models/ClauseAction");
 const TemplateReview = require("../models/TemplateReview");
 const { clauseTemplates } = require("../data/clauseTemplates");
 const { loadAdminAnalytics } = require("../services/adminAnalytics.service");
+const { clearFinalConfirmations } = require("../services/signing.service");
+const { recordAuditLog } = require("../services/audit.service");
+const { recomputeCaseStatus } = require("./approval.controller");
 
 async function getAdminAnalytics(req, res, next) {
   try {
@@ -261,13 +264,41 @@ async function updateAdminClauseReview(req, res, next) {
       return res.status(404).json({ error: "Clause not found" });
     }
 
+    const nextReviewNote = String(reviewNote || "").trim();
+    const reviewChanged =
+      clause.adminReviewStatus !== reviewStatus ||
+      clause.adminReviewNote !== nextReviewNote;
+
     clause.adminReviewStatus = reviewStatus;
-    clause.adminReviewNote = String(reviewNote || "").trim();
+    clause.adminReviewNote = nextReviewNote;
     clause.adminReviewedBy = req.user.id;
     clause.adminReviewedAt = new Date();
 
     await clause.save();
     await clause.populate("adminReviewedBy", "name email");
+
+    const confirmationsReset = reviewChanged
+      ? await clearFinalConfirmations(clause.caseId)
+      : 0;
+
+    if (reviewChanged) {
+      await recomputeCaseStatus(clause.caseId);
+      if (reviewStatus === "NEEDS_REVISION") {
+        await Case.updateOne({ _id: clause.caseId }, { $set: { status: "REVISION" } });
+      }
+    }
+
+    if (confirmationsReset) {
+      await recordAuditLog({
+        caseId: clause.caseId,
+        clauseId: clause._id,
+        userId: req.user.id,
+        type: "SIGNING_CONFIRMATIONS_RESET",
+        title: "Final confirmations reset",
+        message: "Moderator review changed, so both parties must confirm the final review again.",
+        metadata: { confirmationsReset },
+      });
+    }
 
     res.json({ clause });
   } catch (err) {

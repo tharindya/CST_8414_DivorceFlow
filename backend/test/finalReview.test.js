@@ -66,6 +66,41 @@ test("buildFinalReview treats current AI findings as advisory after moderator re
   assert.equal(review.warnings[0].code, "AI_REVIEW_RESULT");
 });
 
+test("buildFinalReview reports signing progress for the current party", () => {
+  const fixture = completeFixture();
+  fixture.currentUserId = partyB;
+  fixture.caseDoc.finalConfirmations = [{
+    role: "PARTY_A",
+    userId: partyA,
+    confirmedAt: new Date("2026-08-01T13:00:00Z"),
+  }];
+
+  const review = buildFinalReview(fixture);
+
+  assert.equal(review.readiness, "SIGNING_IN_PROGRESS");
+  assert.equal(review.signing.confirmedCount, 1);
+  assert.equal(review.signing.currentUserRole, "PARTY_B");
+  assert.equal(review.signing.currentUserConfirmed, false);
+  assert.equal(review.signing.canConfirm, true);
+});
+
+test("buildFinalReview reports a case finalized after both current confirmations", () => {
+  const fixture = completeFixture();
+  fixture.caseDoc.status = "FINALIZED";
+  fixture.caseDoc.finalizedAt = new Date("2026-08-01T14:00:00Z");
+  fixture.caseDoc.finalConfirmations = [
+    { role: "PARTY_A", userId: partyA, confirmedAt: new Date("2026-08-01T13:00:00Z") },
+    { role: "PARTY_B", userId: partyB, confirmedAt: new Date("2026-08-01T14:00:00Z") },
+  ];
+
+  const review = buildFinalReview(fixture);
+
+  assert.equal(review.readiness, "FINALIZED");
+  assert.equal(review.signing.bothConfirmed, true);
+  assert.equal(review.signing.finalized, true);
+  assert.equal(review.canExport, true);
+});
+
 test("buildFinalReview reports actionable blockers", () => {
   const fixture = completeFixture();
   fixture.caseDoc.participants = [{ userId: partyA, role: "PARTY_A" }];

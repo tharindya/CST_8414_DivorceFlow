@@ -14,3 +14,21 @@ test("AuditLog accepts the AI agreement review event type", () => {
 
   assert.equal(auditLog.validateSync(), undefined);
 });
+
+test("AuditLog accepts final signing workflow event types", () => {
+  for (const type of [
+    "FINAL_REVIEW_CONFIRMED",
+    "SIGNING_CONFIRMATIONS_RESET",
+    "CASE_FINALIZED",
+  ]) {
+    const auditLog = new AuditLog({
+      caseId: new mongoose.Types.ObjectId(),
+      userId: new mongoose.Types.ObjectId(),
+      type,
+      title: "Signing workflow event",
+      message: "Signing workflow changed.",
+    });
+
+    assert.equal(auditLog.validateSync(), undefined);
+  }
+});

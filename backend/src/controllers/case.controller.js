@@ -5,9 +5,10 @@ const {
   buildIntakeRecommendations,
 } = require("../services/intakeRecommendations.service");
 const { recordAuditLog } = require("../services/audit.service");
+const { clearFinalConfirmations } = require("../services/signing.service");
 
 const CASE_SELECT_FIELDS =
-  "_id title status participants jurisdiction intake inviteCode inviteUsed partyBEmail invitationStatus createdAt updatedAt";
+  "_id title status participants jurisdiction intake finalConfirmations finalizedAt inviteCode inviteUsed partyBEmail invitationStatus createdAt updatedAt";
 
 const INTAKE_FIELDS = [
   "dependents",
@@ -122,8 +123,14 @@ async function updateIntake(req, res, next) {
       return res.status(404).json({ error: "Case not found" });
     }
 
+    const previousIntake = JSON.stringify(doc.intake?.toObject?.() || doc.intake || {});
     doc.intake = normalizeIntakePayload(req.body || {}, req.user.id);
     await doc.save();
+
+    const intakeChanged = previousIntake !== JSON.stringify(doc.intake?.toObject?.() || doc.intake || {});
+    const confirmationsReset = intakeChanged
+      ? await clearFinalConfirmations(caseId)
+      : 0;
 
     const updated = await Case.findById(caseId).select(CASE_SELECT_FIELDS);
 
@@ -137,6 +144,17 @@ async function updateIntake(req, res, next) {
         : "Guided case intake was saved but is still incomplete.",
       metadata: { completed: !!updated.intake?.completed },
     });
+
+    if (confirmationsReset) {
+      await recordAuditLog({
+        caseId,
+        userId: req.user.id,
+        type: "SIGNING_CONFIRMATIONS_RESET",
+        title: "Final confirmations reset",
+        message: "Guided intake changed, so both parties must confirm the final review again.",
+        metadata: { confirmationsReset },
+      });
+    }
 
     res.json({
       message: updated.intake?.completed

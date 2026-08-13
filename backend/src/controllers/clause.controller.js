@@ -4,6 +4,7 @@ const ClauseVersion = require("../models/ClauseVersion");
 const { recomputeCaseStatus } = require("./approval.controller");
 const { recordAuditLog } = require("../services/audit.service");
 const { requestClauseRewrite } = require("../services/aiClauseRewrite.service");
+const { clearFinalConfirmations } = require("../services/signing.service");
 
 async function listClauses(req, res, next) {
   try {
@@ -71,6 +72,9 @@ async function createClause(req, res, next) {
       updatedBy: req.user.id,
     });
 
+    const confirmationsReset = await clearFinalConfirmations(caseId);
+    await recomputeCaseStatus(caseId);
+
     await recordAuditLog({
       caseId,
       clauseId: clause._id,
@@ -84,6 +88,18 @@ async function createClause(req, res, next) {
         source: clause.templateId ? "template" : "manual",
       },
     });
+
+    if (confirmationsReset) {
+      await recordAuditLog({
+        caseId,
+        clauseId: clause._id,
+        userId: req.user.id,
+        type: "SIGNING_CONFIRMATIONS_RESET",
+        title: "Final confirmations reset",
+        message: "A clause was added, so both parties must confirm the final review again.",
+        metadata: { confirmationsReset },
+      });
+    }
 
     res.status(201).json({ clause });
   } catch (err) {
@@ -151,6 +167,7 @@ async function updateClause(req, res, next) {
         approvalsReset: true,
       });
 
+      const confirmationsReset = await clearFinalConfirmations(clause.caseId);
       await ClauseAction.deleteMany({ clauseId: clause._id });
       await recomputeCaseStatus(clause.caseId);
       approvalsReset = true;
@@ -170,6 +187,18 @@ async function updateClause(req, res, next) {
           newCategory: nextCategory,
         },
       });
+
+      if (confirmationsReset) {
+        await recordAuditLog({
+          caseId: clause.caseId,
+          clauseId: clause._id,
+          userId: req.user.id,
+          type: "SIGNING_CONFIRMATIONS_RESET",
+          title: "Final confirmations reset",
+          message: "A clause changed, so both parties must confirm the final review again.",
+          metadata: { confirmationsReset },
+        });
+      }
     }
 
     res.json({ clause, approvalsReset });
