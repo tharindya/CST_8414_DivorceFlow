@@ -31,36 +31,59 @@ function inviteTone(status) {
   }
 }
 
+async function fetchDashboardData() {
+  const [caseData, analyticsData] = await Promise.all([
+    api.listAdminCases(),
+    api.getAdminAnalytics(),
+  ]);
+
+  return { caseData, analyticsData };
+}
+
 export default function AdminDashboard() {
   const [cases, setCases] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function loadCases() {
+  async function loadDashboard() {
     try {
       setError("");
       setLoading(true);
-      const data = await api.listAdminCases();
-      setCases(data.cases || []);
+      const { caseData, analyticsData } = await fetchDashboardData();
+      setCases(caseData.cases || []);
+      setAnalytics(analyticsData);
     } catch (err) {
-      setError(err.message || "Failed to load admin cases");
+      setError(err.message || "Failed to load admin reporting");
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadCases();
+    let active = true;
+
+    async function loadInitialDashboard() {
+      try {
+        const { caseData, analyticsData } = await fetchDashboardData();
+        if (!active) return;
+        setCases(caseData.cases || []);
+        setAnalytics(analyticsData);
+      } catch (err) {
+        if (active) setError(err.message || "Failed to load admin reporting");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    loadInitialDashboard();
+    return () => { active = false; };
   }, []);
 
-  const stats = useMemo(() => {
-    return {
-      total: cases.length,
-      draft: cases.filter((c) => c.status === "DRAFT").length,
-      negotiating: cases.filter((c) => c.status === "NEGOTIATING").length,
-      ready: cases.filter((c) => c.status === "READY").length,
-    };
-  }, [cases]);
+  const statusRows = useMemo(
+    () => Object.entries(analytics?.cases?.statusCounts || {}),
+    [analytics]
+  );
 
   return (
     <div className="admin-page">
@@ -69,14 +92,14 @@ export default function AdminDashboard() {
           <div className="admin-eyebrow">Legal moderator dashboard</div>
           <h1 className="admin-title">Review all agreement cases</h1>
           <p className="admin-subtitle">
-            Read-only view for moderators to inspect agreements, clause volume,
-            discussion activity, and negotiation progress.
+            Monitor agreement lifecycle, approval progress, moderator workload,
+            unresolved issues, and case activity.
           </p>
         </div>
 
         <button
           type="button"
-          onClick={loadCases}
+          onClick={loadDashboard}
           disabled={loading}
           className="admin-button admin-button-secondary"
         >
@@ -89,20 +112,92 @@ export default function AdminDashboard() {
       <section className="admin-stats">
         <div className="admin-stat-card">
           <span className="admin-stat-label">Total cases</span>
-          <div className="admin-stat-value">{stats.total}</div>
+          <div className="admin-stat-value">{analytics?.cases?.total ?? 0}</div>
         </div>
         <div className="admin-stat-card">
-          <span className="admin-stat-label">Draft</span>
-          <div className="admin-stat-value">{stats.draft}</div>
+          <span className="admin-stat-label">Finalized agreements</span>
+          <div className="admin-stat-value">{analytics?.cases?.finalized ?? 0}</div>
         </div>
         <div className="admin-stat-card">
-          <span className="admin-stat-label">Negotiating</span>
-          <div className="admin-stat-value">{stats.negotiating}</div>
+          <span className="admin-stat-label">Clause approval</span>
+          <div className="admin-stat-value">{analytics?.clauses?.approvalRate ?? 0}%</div>
+          <div className="admin-stat-detail">
+            {analytics?.clauses?.approved ?? 0}/{analytics?.clauses?.total ?? 0} approved
+          </div>
         </div>
         <div className="admin-stat-card">
-          <span className="admin-stat-label">Ready</span>
-          <div className="admin-stat-value">{stats.ready}</div>
+          <span className="admin-stat-label">Moderator reviewed</span>
+          <div className="admin-stat-value">{analytics?.moderator?.reviewRate ?? 0}%</div>
+          <div className="admin-stat-detail">
+            {analytics?.moderator?.reviewed ?? 0}/{analytics?.clauses?.total ?? 0} reviewed
+          </div>
         </div>
+      </section>
+
+      <section className="admin-report-grid" aria-label="Administrative reporting">
+        <article className="admin-report-card">
+          <div className="admin-section-header admin-section-header--row">
+            <h2 className="admin-section-title">Case lifecycle</h2>
+            <span className="admin-report-total">{analytics?.cases?.total ?? 0} cases</span>
+          </div>
+          <div className="admin-progress-list">
+            {statusRows.map(([status, count]) => {
+              const width = analytics?.cases?.total
+                ? Math.round((count / analytics.cases.total) * 100)
+                : 0;
+              return (
+                <div key={status} className="admin-progress-row">
+                  <div className="admin-progress-label">
+                    <span>{status.replaceAll("_", " ")}</span>
+                    <strong>{count}</strong>
+                  </div>
+                  <div className="admin-progress-track" aria-hidden="true">
+                    <span style={{ width: `${width}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </article>
+
+        <article className="admin-report-card">
+          <div className="admin-section-header admin-section-header--row">
+            <h2 className="admin-section-title">Unresolved workflow issues</h2>
+            <span className="admin-report-total">{analytics?.unresolved?.total ?? 0} items</span>
+          </div>
+          <div className="admin-issue-grid">
+            <div><span>Rejected clauses</span><strong>{analytics?.unresolved?.rejectedClauses ?? 0}</strong></div>
+            <div><span>Pending approvals</span><strong>{analytics?.unresolved?.pendingApprovals ?? 0}</strong></div>
+            <div><span>Moderator revisions</span><strong>{analytics?.unresolved?.moderatorRevisions ?? 0}</strong></div>
+            <div><span>Awaiting moderator</span><strong>{analytics?.unresolved?.moderatorPending ?? 0}</strong></div>
+          </div>
+          <div className="admin-activity-line">
+            <span>Both parties joined</span>
+            <strong>{analytics?.cases?.bothPartiesJoined ?? 0}/{analytics?.cases?.total ?? 0} ({analytics?.cases?.partyJoinRate ?? 0}%)</strong>
+          </div>
+          <div className="admin-activity-line">
+            <span>Recorded comments</span>
+            <strong>{analytics?.activity?.comments ?? 0}</strong>
+          </div>
+        </article>
+
+        <article className="admin-report-card">
+          <div className="admin-section-header">
+            <h2 className="admin-section-title">Common unresolved categories</h2>
+          </div>
+          {analytics?.unresolved?.commonCategories?.length ? (
+            <div className="admin-category-list">
+              {analytics.unresolved.commonCategories.map((item) => (
+                <div key={item.category} className="admin-category-row">
+                  <span>{item.category}</span>
+                  <strong>{item.count}</strong>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="admin-report-empty">No unresolved clause categories.</div>
+          )}
+        </article>
       </section>
 
       <section className="admin-section">

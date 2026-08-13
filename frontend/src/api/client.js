@@ -61,6 +61,8 @@ export const api = {
   // admin
   listAdminCases: () => request("/admin/cases"),
 
+  getAdminAnalytics: () => request("/admin/analytics"),
+
   getAdminCase: (caseId) => request(`/admin/cases/${caseId}`),
 
   listAdminTemplates: () => request("/admin/templates"),

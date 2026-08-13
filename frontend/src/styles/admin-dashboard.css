@@ -103,6 +103,142 @@
   color: var(--text);
 }
 
+.admin-stat-detail {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.admin-report-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 0.8fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.admin-report-card {
+  min-width: 0;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+}
+
+.admin-section-header--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-report-total {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-progress-list {
+  display: grid;
+  gap: 11px;
+}
+
+.admin-progress-row {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-progress-label,
+.admin-activity-line,
+.admin-category-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-progress-label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.admin-progress-label strong,
+.admin-category-row strong {
+  color: var(--text);
+}
+
+.admin-progress-track {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #ede9fe;
+}
+
+.admin-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+}
+
+.admin-issue-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.admin-issue-grid > div {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid #fed7aa;
+  border-radius: 14px;
+  background: #fff7ed;
+}
+
+.admin-issue-grid span,
+.admin-activity-line span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.admin-issue-grid strong {
+  font-size: 1.35rem;
+}
+
+.admin-activity-line {
+  padding: 10px 2px;
+  border-top: 1px solid var(--border);
+  font-size: 0.86rem;
+}
+
+.admin-category-list {
+  display: grid;
+  gap: 9px;
+}
+
+.admin-category-row {
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.admin-category-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-report-empty {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .admin-section {
   margin-top: 10px;
 }
@@ -368,6 +504,7 @@
 
 @media (max-width: 980px) {
   .admin-stats,
+  .admin-report-grid,
   .admin-case-grid,
   .admin-review-grid {
     grid-template-columns: 1fr;
@@ -399,6 +536,7 @@
   }
 
   .admin-stat-card,
+  .admin-report-card,
   .admin-case-card,
   .admin-clause-card,
   .admin-review-card,
