@@ -171,6 +171,8 @@ export const api = {
   getMockReview: (caseId) => request(`/cases/${caseId}/mock-review`),
 
   // AI agreement review
+  getLatestAiAgreementReview: (caseId) => request(`/cases/${caseId}/ai-review`),
+
   getAiAgreementReview: (caseId) =>
     request(`/cases/${caseId}/ai-review`, { method: "POST" }),
 

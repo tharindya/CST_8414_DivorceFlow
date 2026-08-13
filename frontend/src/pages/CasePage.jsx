@@ -181,10 +181,6 @@ export default function CasePage() {
   const [clauseVersions, setClauseVersions] = useState([]);
   const [auditEvents, setAuditEvents] = useState([]);
 
-  useEffect(() => {
-    setAiReview(null);
-  }, [clauses, caseDoc?.status, caseDoc?.intake?.completedAt]);
-
   async function loadExportCheck(currentCaseDoc) {
     if (!currentCaseDoc || currentCaseDoc.status !== "READY") {
       setExportCheck(null);
@@ -300,6 +296,7 @@ export default function CasePage() {
       const clauseRes = await api.listClauses(caseId);
       const statusRes = await api.getClauseStatus(caseId);
       const templateRes = await api.listTemplates(caseRes.case?.jurisdiction || "General");
+      const aiReviewRes = await api.getLatestAiAgreementReview(caseId);
 
       const loadedClauses = clauseRes.clauses || [];
       const loadedTemplates = templateRes.templates || [];
@@ -311,6 +308,7 @@ export default function CasePage() {
       setStatusRows(statusRes.clauses || []);
       setTemplates(loadedTemplates);
       setMockReview(null);
+      setAiReview(aiReviewRes.review || null);
       await loadExportCheck(caseRes.case);
       await loadIntakeRecommendations();
       await loadAuditTrail();
