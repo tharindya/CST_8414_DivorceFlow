@@ -1,6 +1,11 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const {
+  validateRegistration,
+  validateLogin,
+  sendValidationError,
+} = require("../services/validation.service");
 
 function signToken(user) {
   return jwt.sign(
@@ -18,13 +23,7 @@ async function register(req, res, next) {
   try {
     const { name, email, password } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: "name, email, password are required" });
-    }
-
-    if (password.length < 8) {
-      return res.status(400).json({ error: "Password must be at least 8 characters" });
-    }
+    if (sendValidationError(res, validateRegistration(req.body))) return;
 
     const existing = await User.findOne({ email: email.toLowerCase() });
     if (existing) {
@@ -34,8 +33,8 @@ async function register(req, res, next) {
     const passwordHash = await bcrypt.hash(password, 10);
 
     const user = await User.create({
-      name,
-      email: email.toLowerCase(),
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
       passwordHash,
       role: "USER",
     });
@@ -60,11 +59,9 @@ async function login(req, res, next) {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ error: "email and password are required" });
-    }
+    if (sendValidationError(res, validateLogin(req.body))) return;
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
     if (!user) {
       return res.status(401).json({ error: "Invalid credentials" });
     }

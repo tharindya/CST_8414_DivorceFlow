@@ -6,6 +6,12 @@ const {
 } = require("../services/intakeRecommendations.service");
 const { recordAuditLog } = require("../services/audit.service");
 const { clearFinalConfirmations } = require("../services/signing.service");
+const {
+  validateCaseCreation,
+  validateJoinCase,
+  validateIntake,
+  sendValidationError,
+} = require("../services/validation.service");
 
 const CASE_SELECT_FIELDS =
   "_id title status participants jurisdiction intake finalConfirmations finalizedAt inviteCode inviteUsed partyBEmail invitationStatus createdAt updatedAt";
@@ -55,13 +61,7 @@ async function createCase(req, res, next) {
   try {
     const { title, partyBEmail, jurisdiction } = req.body;
 
-    if (!title || title.trim().length < 3) {
-      return res.status(400).json({ error: "title must be at least 3 characters" });
-    }
-
-    if (!partyBEmail || !normalizeEmail(partyBEmail)) {
-      return res.status(400).json({ error: "partyBEmail is required" });
-    }
+    if (sendValidationError(res, validateCaseCreation(req.body))) return;
 
     const inviteCode = makeInviteCode();
     const inviteToken = makeInviteToken();
@@ -122,6 +122,8 @@ async function updateIntake(req, res, next) {
     if (!doc) {
       return res.status(404).json({ error: "Case not found" });
     }
+
+    if (sendValidationError(res, validateIntake(req.body))) return;
 
     const previousIntake = JSON.stringify(doc.intake?.toObject?.() || doc.intake || {});
     doc.intake = normalizeIntakePayload(req.body || {}, req.user.id);
@@ -190,9 +192,7 @@ async function joinCase(req, res, next) {
     const { caseId } = req.params;
     const { inviteCode } = req.body;
 
-    if (!inviteCode) {
-      return res.status(400).json({ error: "inviteCode is required" });
-    }
+    if (sendValidationError(res, validateJoinCase(caseId, req.body))) return;
 
     const doc = await Case.findById(caseId);
 

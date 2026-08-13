@@ -5,6 +5,7 @@ const { recomputeCaseStatus } = require("./approval.controller");
 const { recordAuditLog } = require("../services/audit.service");
 const { requestClauseRewrite } = require("../services/aiClauseRewrite.service");
 const { clearFinalConfirmations } = require("../services/signing.service");
+const { validateClause, sendValidationError } = require("../services/validation.service");
 
 async function listClauses(req, res, next) {
   try {
@@ -39,9 +40,7 @@ async function createClause(req, res, next) {
       templateDisclaimer,
     } = req.body;
 
-    if (!title || title.trim().length < 2) {
-      return res.status(400).json({ error: "title must be at least 2 characters" });
-    }
+    if (sendValidationError(res, validateClause(req.body))) return;
 
     const last = await Clause.findOne({ caseId })
       .sort({ orderIndex: -1 })
@@ -114,6 +113,8 @@ async function updateClause(req, res, next) {
 
     const clause = await Clause.findById(clauseId);
     if (!clause) return res.status(404).json({ error: "Clause not found" });
+
+    if (sendValidationError(res, validateClause(req.body, { partial: true }))) return;
 
     const nextTitle =
       typeof title === "string" ? title.trim() : clause.title;

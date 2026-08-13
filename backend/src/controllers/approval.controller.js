@@ -4,6 +4,7 @@ const Case = require("../models/Case");
 const Comment = require("../models/Comment");
 const { recordAuditLog } = require("../services/audit.service");
 const { clearFinalConfirmations } = require("../services/signing.service");
+const { validateRejection, sendValidationError } = require("../services/validation.service");
 
 async function ensureCaseIsNotFinalized(caseId) {
   const caseDoc = await Case.findById(caseId).select("status");
@@ -130,9 +131,7 @@ async function rejectClause(req, res, next) {
     const { clauseId } = req.params;
     const { comment } = req.body;
 
-    if (!comment || !comment.trim()) {
-      return res.status(400).json({ error: "Reject requires a comment" });
-    }
+    if (sendValidationError(res, validateRejection(req.body))) return;
 
     const clause = await Clause.findById(clauseId).select("caseId title");
     if (!clause) {
