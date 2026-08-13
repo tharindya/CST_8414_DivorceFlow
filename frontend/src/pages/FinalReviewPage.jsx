@@ -157,6 +157,23 @@ export default function FinalReviewPage() {
             </div>
           </section>
 
+          {review.warnings?.length > 0 && (
+            <section className="final-panel final-advisory-panel">
+              <div className="final-panel-header">
+                <h2>Advisory warnings</h2>
+                <span>{review.warnings.length}</span>
+              </div>
+              <div className="final-advisory-list">
+                {review.warnings.map((warning) => (
+                  <article key={warning.code} className="final-advisory">
+                    <strong>{warning.title}</strong>
+                    <p>{warning.message}</p>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
           <section className="final-panel final-clause-panel">
             <div className="final-panel-header">
               <h2>Clause review matrix</h2>

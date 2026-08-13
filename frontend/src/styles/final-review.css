@@ -4,7 +4,7 @@
 .final-back { display: inline-block; margin-bottom: 18px; font-weight: 700; color: var(--muted); }
 .final-eyebrow { color: var(--primary); font-size: .8rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .final-hero h1 { margin: 4px 0 8px; font-size: clamp(2rem, 5vw, 3rem); line-height: 1.05; }
-.final-hero p, .final-readiness p, .final-blocker p, .final-muted { color: var(--muted); margin: 0; }
+.final-hero p, .final-readiness p, .final-blocker p, .final-advisory p, .final-muted { color: var(--muted); margin: 0; }
 .final-hero-status { display: grid; justify-items: end; gap: 8px; color: var(--muted); }
 .final-status { display: inline-flex; align-items: center; border-radius: 999px; padding: 5px 9px; font-size: .72rem; line-height: 1.2; font-weight: 800; text-transform: uppercase; white-space: nowrap; }
 .final-status--success { color: #166534; background: #dcfce7; }
@@ -32,6 +32,10 @@
 .final-blocker-list { display: grid; gap: 10px; }
 .final-blocker { padding: 14px; border-radius: 14px; border: 1px solid #fecaca; background: #fff7f7; }
 .final-blocker p { margin-top: 4px; }
+.final-advisory-panel { border-color: #f3d9a2; background: #fffaf0; }
+.final-advisory-list { display: grid; gap: 10px; }
+.final-advisory { padding: 14px; border-radius: 14px; border: 1px solid #f3d9a2; background: #fffbeb; }
+.final-advisory p { margin-top: 4px; }
 .final-ok { padding: 14px; border-radius: 14px; color: #166534; background: #f0fdf4; font-weight: 700; }
 .final-ai-summary { display: grid; justify-items: start; gap: 14px; }
 .final-ai-summary dl { width: 100%; margin: 0; display: grid; gap: 8px; }
