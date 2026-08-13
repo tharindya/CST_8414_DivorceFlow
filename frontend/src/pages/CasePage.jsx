@@ -644,18 +644,6 @@ export default function CasePage() {
     }
   }
 
-  async function onDownloadPdf() {
-    try {
-      setError("");
-      setBusy(true);
-      await api.downloadCasePdf(caseId);
-    } catch (err) {
-      setError(err.message || "Failed to export PDF");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   useEffect(() => {
     function handleKeyDown(e) {
       if (e.key === "Escape" && rejectModalOpen && !busy) {
@@ -751,16 +739,6 @@ export default function CasePage() {
             {reviewBusy ? "Running review..." : "Run mock review"}
           </button>
 
-          {caseDoc?.status === "READY" && (
-            <button
-              type="button"
-              onClick={onDownloadPdf}
-              disabled={busy}
-              className="case-button case-button-primary"
-            >
-              Download PDF
-            </button>
-          )}
         </div>
       </section>
 
