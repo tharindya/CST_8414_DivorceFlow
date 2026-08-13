@@ -6,6 +6,7 @@ import "../styles/admin-dashboard.css";
 function caseTone(status) {
   switch ((status || "").toUpperCase()) {
     case "READY":
+    case "FINALIZED":
       return "success";
     case "NEGOTIATING":
       return "warning";

@@ -6,6 +6,7 @@ import "../styles/case-page.css";
 function caseStatusClass(status) {
   switch ((status || "").toUpperCase()) {
     case "READY":
+    case "FINALIZED":
       return "case-status-ready";
     case "NEGOTIATING":
       return "case-status-negotiating";

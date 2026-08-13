@@ -4,7 +4,7 @@ import { api } from "../api/client";
 import "../styles/final-review.css";
 
 function statusTone(status) {
-  if (["APPROVED", "REVIEWED", "READY_FOR_SIGNING", "READY_FOR_HUMAN_REVIEW"].includes(status)) {
+  if (["APPROVED", "REVIEWED", "CONFIRMED", "READY_FOR_SIGNING", "READY_FOR_HUMAN_REVIEW", "FINALIZED"].includes(status)) {
     return "success";
   }
   if (["REJECTED", "NEEDS_REVISION", "NOT_READY", "NEEDS_WORK"].includes(status)) {
@@ -26,7 +26,9 @@ export default function FinalReviewPage() {
   const [review, setReview] = useState(null);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -59,6 +61,25 @@ export default function FinalReviewPage() {
     }
   }
 
+  async function confirmReview() {
+    try {
+      setError("");
+      setSuccess("");
+      setConfirming(true);
+      const data = await api.confirmFinalReview(caseId);
+      setReview(data);
+      setSuccess(
+        data.signing?.finalized
+          ? "Both parties confirmed final review. The agreement is finalized."
+          : "Your final review confirmation was recorded."
+      );
+    } catch (confirmError) {
+      setError(confirmError.message || "Failed to confirm final review");
+    } finally {
+      setConfirming(false);
+    }
+  }
+
   if (loading) return <div className="final-shell">Loading final review...</div>;
 
   return (
@@ -80,12 +101,19 @@ export default function FinalReviewPage() {
       </section>
 
       {error && <div className="final-alert final-alert--error">{error}</div>}
+      {success && <div className="final-alert final-alert--success">{success}</div>}
 
       {review && (
         <>
           <section className={`final-readiness final-readiness--${review.readyForSigning ? "ready" : "blocked"}`}>
             <div>
-              <h2>{review.readyForSigning ? "Ready for signing workflow" : "Agreement is not ready"}</h2>
+              <h2>
+                {review.signing?.finalized
+                  ? "Agreement finalized"
+                  : review.readyForSigning
+                    ? "Ready for signing workflow"
+                    : "Agreement is not ready"}
+              </h2>
               <p>{review.disclaimer}</p>
             </div>
             <button
@@ -96,6 +124,55 @@ export default function FinalReviewPage() {
             >
               {downloading ? "Preparing PDF..." : "Download agreement PDF"}
             </button>
+          </section>
+
+          <section className="final-panel final-signing-panel">
+            <div className="final-panel-header">
+              <div>
+                <h2>Final review confirmations</h2>
+                <p className="final-muted">
+                  Each party confirms that they reviewed the final agreement. This is a workflow acknowledgement, not a legally binding electronic signature.
+                </p>
+              </div>
+              <span>{review.signing?.confirmedCount || 0}/2 confirmed</span>
+            </div>
+
+            <div className="final-confirmation-grid">
+              {(review.signing?.confirmations || []).map((confirmation) => (
+                <article
+                  key={confirmation.role}
+                  className={`final-confirmation-card ${confirmation.confirmed ? "final-confirmation-card--confirmed" : ""}`}
+                >
+                  <div>
+                    <strong>{confirmation.role.replace("_", " ")}</strong>
+                    <span>{confirmation.confirmed ? "Confirmed" : "Waiting for confirmation"}</span>
+                  </div>
+                  <StatusBadge status={confirmation.confirmed ? "CONFIRMED" : "PENDING"} />
+                  {confirmation.confirmedAt && (
+                    <time>{new Date(confirmation.confirmedAt).toLocaleString()}</time>
+                  )}
+                </article>
+              ))}
+            </div>
+
+            <div className="final-signing-actions">
+              {review.signing?.finalized ? (
+                <div className="final-ok">
+                  Finalized {review.signing.finalizedAt ? new Date(review.signing.finalizedAt).toLocaleString() : ""}
+                </div>
+              ) : review.signing?.currentUserConfirmed ? (
+                <div className="final-ok">Your confirmation has been recorded.</div>
+              ) : (
+                <button
+                  type="button"
+                  className="final-button final-button--primary"
+                  disabled={!review.signing?.canConfirm || confirming}
+                  onClick={confirmReview}
+                >
+                  {confirming ? "Recording confirmation..." : "Confirm I reviewed the final agreement"}
+                </button>
+              )}
+            </div>
           </section>
 
           <section className="final-summary-grid">

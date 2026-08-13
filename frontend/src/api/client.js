@@ -98,6 +98,9 @@ export const api = {
 
   getFinalReview: (caseId) => request(`/cases/${caseId}/final-review`),
 
+  confirmFinalReview: (caseId) =>
+    request(`/cases/${caseId}/final-review/confirm`, { method: "POST" }),
+
   updateCaseIntake: (caseId, payload) =>
     request(`/cases/${caseId}/intake`, {
       method: "PUT",
