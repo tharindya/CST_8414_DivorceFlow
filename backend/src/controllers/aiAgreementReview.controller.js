@@ -1,7 +1,38 @@
 const Case = require("../models/Case");
 const Clause = require("../models/Clause");
+const AiAgreementReview = require("../models/AiAgreementReview");
 const { recordAuditLog } = require("../services/audit.service");
 const { requestAgreementReview } = require("../services/aiAgreementReview.service");
+
+const DISCLAIMER =
+  "This AI-generated drafting review may be incomplete or incorrect. It is not legal advice and does not replace review by a qualified legal professional.";
+
+function reviewResponse(review) {
+  return {
+    reviewType: "AI_AGREEMENT_REVIEW",
+    id: review._id,
+    summary: review.summary,
+    readiness: review.readiness,
+    issues: review.issues || [],
+    recommendations: review.recommendations || [],
+    provider: review.provider || "Gemini",
+    model: review.model,
+    createdAt: review.createdAt,
+    disclaimer: DISCLAIMER,
+  };
+}
+
+async function getLatestAgreementReview(req, res, next) {
+  try {
+    const review = await AiAgreementReview.findOne({ caseId: req.params.caseId })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({ review: review ? reviewResponse(review) : null });
+  } catch (error) {
+    next(error);
+  }
+}
 
 async function reviewAgreement(req, res, next) {
   try {
@@ -14,6 +45,17 @@ async function reviewAgreement(req, res, next) {
       .lean();
 
     const result = await requestAgreementReview({ caseDoc, clauses });
+
+    const savedReview = await AiAgreementReview.create({
+      caseId,
+      createdBy: req.user.id,
+      provider: "Gemini",
+      model: result.model,
+      summary: result.summary,
+      readiness: result.readiness,
+      issues: result.issues,
+      recommendations: result.recommendations,
+    });
 
     await recordAuditLog({
       caseId,
@@ -29,16 +71,10 @@ async function reviewAgreement(req, res, next) {
       },
     });
 
-    res.json({
-      reviewType: "AI_AGREEMENT_REVIEW",
-      ...result,
-      provider: "Gemini",
-      disclaimer:
-        "This AI-generated drafting review may be incomplete or incorrect. It is not legal advice and does not replace review by a qualified legal professional.",
-    });
+    res.json(reviewResponse(savedReview));
   } catch (error) {
     next(error);
   }
 }
 
-module.exports = { reviewAgreement };
+module.exports = { getLatestAgreementReview, reviewAgreement };

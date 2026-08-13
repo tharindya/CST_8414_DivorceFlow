@@ -1,7 +1,7 @@
 const Case = require("../models/Case");
 const Clause = require("../models/Clause");
 const ClauseAction = require("../models/ClauseAction");
-const AuditLog = require("../models/AuditLog");
+const AiAgreementReview = require("../models/AiAgreementReview");
 const { buildExportCheck } = require("./exportCheck.service");
 
 function buildFinalReview({ caseDoc, clauses, actions, exportCheck, latestAiReview }) {
@@ -103,11 +103,11 @@ function buildFinalReview({ caseDoc, clauses, actions, exportCheck, latestAiRevi
     addBlocker("AI_REVIEW", "AI agreement review has not been run", "Run the AI agreement review after completing the draft.");
   } else if (!aiReviewCurrent) {
     addBlocker("AI_REVIEW_STALE", "AI agreement review is outdated", "Run the AI agreement review again after the latest drafting changes.");
-  } else if (latestAiReview.metadata?.readiness !== "READY_FOR_HUMAN_REVIEW") {
+  } else if (latestAiReview.readiness !== "READY_FOR_HUMAN_REVIEW") {
     addBlocker(
       "AI_REVIEW_RESULT",
       "AI review found drafting issues",
-      `Latest result: ${latestAiReview.metadata?.readiness || "UNKNOWN"}; ${latestAiReview.metadata?.issueCount || 0} issue(s).`
+      `Latest result: ${latestAiReview.readiness || "UNKNOWN"}; ${(latestAiReview.issues || []).length} issue(s).`
     );
   }
 
@@ -137,10 +137,10 @@ function buildFinalReview({ caseDoc, clauses, actions, exportCheck, latestAiRevi
     completeness: exportCheck,
     latestAiReview: latestAiReview
       ? {
-          readiness: latestAiReview.metadata?.readiness || "UNKNOWN",
-          issueCount: latestAiReview.metadata?.issueCount || 0,
-          provider: latestAiReview.metadata?.provider || "AI",
-          model: latestAiReview.metadata?.model || null,
+          readiness: latestAiReview.readiness || "UNKNOWN",
+          issueCount: (latestAiReview.issues || []).length,
+          provider: latestAiReview.provider || "AI",
+          model: latestAiReview.model || null,
           createdAt: latestAiReview.createdAt,
           current: aiReviewCurrent,
         }
@@ -157,7 +157,7 @@ async function loadFinalReview(caseId) {
   const [clauses, actions, latestAiReview] = await Promise.all([
     Clause.find({ caseId }).sort({ orderIndex: 1, createdAt: 1 }).lean(),
     ClauseAction.find({ caseId }).sort({ createdAt: -1 }).lean(),
-    AuditLog.findOne({ caseId, type: "AI_AGREEMENT_REVIEW" }).sort({ createdAt: -1 }).lean(),
+    AiAgreementReview.findOne({ caseId }).sort({ createdAt: -1 }).lean(),
   ]);
 
   return buildFinalReview({
