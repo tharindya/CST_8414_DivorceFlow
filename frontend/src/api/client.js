@@ -27,7 +27,11 @@ async function request(path, options = {}) {
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    throw new Error(data?.error || `Request failed: ${res.status}`);
+    const error = new Error(data?.error || `Request failed: ${res.status}`);
+    error.status = res.status;
+    error.code = data?.code || null;
+    error.fields = data?.fields || {};
+    throw error;
   }
 
   return data;

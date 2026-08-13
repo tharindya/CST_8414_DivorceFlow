@@ -263,6 +263,11 @@
   background: linear-gradient(180deg, #ffffff 0%, #fbfbfd 100%);
 }
 
+.case-review-card-ai {
+  background: linear-gradient(180deg, #fbf9ff 0%, #f7f3ff 100%);
+  border-color: #dcccfb;
+}
+
 .case-review-header {
   display: flex;
   justify-content: space-between;
@@ -356,6 +361,38 @@
   margin-top: 6px;
   color: #374151;
   font-size: 0.95rem;
+}
+
+.case-ai-readiness {
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: #ede9fe;
+  color: #5b21b6;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.case-ai-readiness--needs_work {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.case-ai-readiness--review_required {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.case-ai-readiness--ready_for_human_review {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.case-ai-clause-name {
+  margin-top: 6px;
+  color: #6d28d9;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .case-muted {
@@ -1155,6 +1192,19 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.case-input[aria-invalid="true"],
+.case-select[aria-invalid="true"],
+.case-textarea[aria-invalid="true"] {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.14);
+}
+
+.case-field-error {
+  color: #b91c1c;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 

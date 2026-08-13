@@ -10,17 +10,20 @@ export default function Login() {
   const [email, setEmail] = useState("a@test.com");
   const [password, setPassword] = useState("password123");
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e) {
     e.preventDefault();
     setError("");
+    setFieldErrors({});
     setBusy(true);
 
     try {
       await login(email, password);
       navigate("/dashboard");
     } catch (err) {
+      setFieldErrors(err.fields || {});
       setError(err.message || "Login failed");
     } finally {
       setBusy(false);
@@ -44,10 +47,13 @@ export default function Login() {
             <input
               className="auth-input"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => { setEmail(e.target.value); setFieldErrors((current) => ({ ...current, email: "" })); }}
               placeholder="you@example.com"
               autoComplete="email"
+              aria-invalid={Boolean(fieldErrors.email)}
+              aria-describedby={fieldErrors.email ? "login-email-error" : undefined}
             />
+            {fieldErrors.email && <span id="login-email-error" className="auth-field-error">{fieldErrors.email}</span>}
           </label>
 
           <label className="auth-field">
@@ -55,11 +61,14 @@ export default function Login() {
             <input
               className="auth-input"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => { setPassword(e.target.value); setFieldErrors((current) => ({ ...current, password: "" })); }}
               type="password"
               placeholder="Enter your password"
               autoComplete="current-password"
+              aria-invalid={Boolean(fieldErrors.password)}
+              aria-describedby={fieldErrors.password ? "login-password-error" : undefined}
             />
+            {fieldErrors.password && <span id="login-password-error" className="auth-field-error">{fieldErrors.password}</span>}
           </label>
 
           <button type="submit" disabled={busy} className="auth-button">

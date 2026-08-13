@@ -429,3 +429,14 @@
     width: 100%;
   }
 }
+
+.dashboard-input[aria-invalid="true"],
+.dashboard-select[aria-invalid="true"] {
+  border-color: var(--danger-border);
+}
+
+.dashboard-field-error {
+  color: var(--danger-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+}

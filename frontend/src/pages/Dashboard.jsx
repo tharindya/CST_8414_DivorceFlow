@@ -42,10 +42,12 @@ export default function Dashboard() {
   const [partyBEmail, setPartyBEmail] = useState("");
   const [jurisdiction, setJurisdiction] = useState("General");
   const [creating, setCreating] = useState(false);
+  const [createFieldErrors, setCreateFieldErrors] = useState({});
 
   const [joinCaseId, setJoinCaseId] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [joining, setJoining] = useState(false);
+  const [joinFieldErrors, setJoinFieldErrors] = useState({});
 
   async function loadCases() {
     setError("");
@@ -77,6 +79,7 @@ export default function Dashboard() {
     e.preventDefault();
     setError("");
     setMessage("");
+    setCreateFieldErrors({});
     setCreating(true);
 
     try {
@@ -89,7 +92,7 @@ export default function Dashboard() {
       try {
         await api.sendInvite(data.case._id);
         setMessage("Agreement created and invitation email sent.");
-      } catch (inviteErr) {
+      } catch {
         setMessage(
           "Agreement created successfully. Email invitation could not be sent, but you can still share the case ID and invite code manually."
         );
@@ -97,6 +100,7 @@ export default function Dashboard() {
 
       navigate(`/cases/${data.case._id}`);
     } catch (err) {
+      setCreateFieldErrors(err.fields || {});
       setError(err.message || "Failed to create case");
     } finally {
       setCreating(false);
@@ -107,6 +111,7 @@ export default function Dashboard() {
     e.preventDefault();
     setError("");
     setMessage("");
+    setJoinFieldErrors({});
     setJoining(true);
 
     try {
@@ -115,6 +120,7 @@ export default function Dashboard() {
       });
       navigate(`/cases/${data.case._id}`);
     } catch (err) {
+      setJoinFieldErrors(err.fields || {});
       setError(err.message || "Failed to join case");
     } finally {
       setJoining(false);
@@ -202,10 +208,12 @@ export default function Dashboard() {
               <span className="dashboard-label">Agreement title</span>
               <input
                 value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
+                onChange={(e) => { setNewTitle(e.target.value); setCreateFieldErrors((current) => ({ ...current, title: "" })); }}
                 className="dashboard-input"
                 placeholder="Agreement title"
+                aria-invalid={Boolean(createFieldErrors.title)}
               />
+              {createFieldErrors.title && <span className="dashboard-field-error">{createFieldErrors.title}</span>}
             </label>
 
             <label className="dashboard-field">
@@ -213,17 +221,19 @@ export default function Dashboard() {
               <input
                 type="email"
                 value={partyBEmail}
-                onChange={(e) => setPartyBEmail(e.target.value)}
+                onChange={(e) => { setPartyBEmail(e.target.value); setCreateFieldErrors((current) => ({ ...current, partyBEmail: "" })); }}
                 className="dashboard-input"
                 placeholder="otherparty@example.com"
+                aria-invalid={Boolean(createFieldErrors.partyBEmail)}
               />
+              {createFieldErrors.partyBEmail && <span className="dashboard-field-error">{createFieldErrors.partyBEmail}</span>}
             </label>
 
             <label className="dashboard-field">
               <span className="dashboard-label">Jurisdiction</span>
               <select
                 value={jurisdiction}
-                onChange={(e) => setJurisdiction(e.target.value)}
+                onChange={(e) => { setJurisdiction(e.target.value); setCreateFieldErrors((current) => ({ ...current, jurisdiction: "" })); }}
                 className="dashboard-select"
               >
                 <option value="General">General</option>
@@ -232,6 +242,7 @@ export default function Dashboard() {
                 <option value="British Columbia">British Columbia</option>
                 <option value="Alberta">Alberta</option>
               </select>
+              {createFieldErrors.jurisdiction && <span className="dashboard-field-error">{createFieldErrors.jurisdiction}</span>}
             </label>
 
             <button
@@ -259,20 +270,24 @@ export default function Dashboard() {
               <span className="dashboard-label">Case ID</span>
               <input
                 value={joinCaseId}
-                onChange={(e) => setJoinCaseId(e.target.value)}
+                onChange={(e) => { setJoinCaseId(e.target.value); setJoinFieldErrors((current) => ({ ...current, caseId: "" })); }}
                 className="dashboard-input"
                 placeholder="Paste the case ID"
+                aria-invalid={Boolean(joinFieldErrors.caseId)}
               />
+              {joinFieldErrors.caseId && <span className="dashboard-field-error">{joinFieldErrors.caseId}</span>}
             </label>
 
             <label className="dashboard-field">
               <span className="dashboard-label">Invite code</span>
               <input
                 value={inviteCode}
-                onChange={(e) => setInviteCode(e.target.value)}
+                onChange={(e) => { setInviteCode(e.target.value); setJoinFieldErrors((current) => ({ ...current, inviteCode: "" })); }}
                 className="dashboard-input"
                 placeholder="Paste the invite code"
+                aria-invalid={Boolean(joinFieldErrors.inviteCode)}
               />
+              {joinFieldErrors.inviteCode && <span className="dashboard-field-error">{joinFieldErrors.inviteCode}</span>}
             </label>
 
             <button

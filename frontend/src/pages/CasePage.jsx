@@ -165,10 +165,12 @@ export default function CasePage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState("General");
+  const [newContent, setNewContent] = useState("");
 
   const [draftContent, setDraftContent] = useState("");
   const [rewriteMode, setRewriteMode] = useState("CLEAR");
@@ -201,6 +203,7 @@ export default function CasePage() {
       ...prev,
       [field]: value,
     }));
+    setFieldErrors((current) => ({ ...current, [field]: "" }));
   }
 
   async function onSaveIntake(e) {
@@ -208,6 +211,7 @@ export default function CasePage() {
 
     try {
       setError("");
+      setFieldErrors({});
       setIntakeMessage("");
       setIntakeSaving(true);
 
@@ -219,6 +223,7 @@ export default function CasePage() {
       await loadIntakeRecommendations();
       await loadAuditTrail();
     } catch (err) {
+      setFieldErrors(err.fields || {});
       setError(err.message || "Failed to save guided intake");
     } finally {
       setIntakeSaving(false);
@@ -371,11 +376,11 @@ export default function CasePage() {
     if (template) {
       setNewTitle(template.title);
       setNewCategory(template.category);
-      setDraftContent("");
+      setNewContent("");
     } else {
       setNewTitle("");
       setNewCategory("General");
-      setDraftContent("");
+      setNewContent("");
     }
   }
 
@@ -394,7 +399,7 @@ export default function CasePage() {
       setBusy(true);
 
       const data = await api.buildTemplateDraft(selectedTemplateId, templateValues);
-      setDraftContent(data.content || "");
+      setNewContent(data.content || "");
       setNewTitle(data.template?.title || newTitle);
       setNewCategory(data.template?.category || newCategory);
 
@@ -452,13 +457,14 @@ export default function CasePage() {
   async function onCreateClause(e) {
     e.preventDefault();
     setError("");
+    setFieldErrors({});
     setBusy(true);
 
     try {
       const data = await api.createClause(caseId, {
         title: newTitle,
         category: newCategory,
-        contentCurrent: draftContent,
+        contentCurrent: newContent,
 
         templateId: templateDetails?.id || null,
         templateTitle: templateDetails?.title || null,
@@ -492,9 +498,10 @@ export default function CasePage() {
       setTemplateValues({});
       setNewTitle("");
       setNewCategory("General");
-      setDraftContent("");
+      setNewContent("");
       setSelectedClauseId(created._id);
     } catch (err) {
+      setFieldErrors(err.fields || {});
       setError(err.message || "Failed to create clause");
     } finally {
       setBusy(false);
@@ -505,6 +512,7 @@ export default function CasePage() {
     if (!selectedClause) return;
 
     setError("");
+    setFieldErrors({});
     setBusy(true);
 
     try {
@@ -527,6 +535,7 @@ export default function CasePage() {
       await loadAuditTrail();
       await loadClauseVersions(updated._id);
     } catch (err) {
+      setFieldErrors(err.fields || {});
       setError(err.message || "Failed to save clause");
     } finally {
       setBusy(false);
@@ -558,6 +567,7 @@ export default function CasePage() {
     if (!selectedClause) return;
 
     setError("");
+    setFieldErrors({});
     setBusy(true);
 
     try {
@@ -567,6 +577,7 @@ export default function CasePage() {
       await loadCommentsForClause(selectedClause._id);
       await loadAuditTrail();
     } catch (err) {
+      setFieldErrors(err.fields || {});
       setError(err.message || "Failed to add comment");
     } finally {
       setBusy(false);
@@ -615,11 +626,13 @@ export default function CasePage() {
 
     const reason = rejectReason.trim();
     if (!reason) {
+      setFieldErrors({ comment: "Rejection reason is required" });
       setError("Reason for rejection is required.");
       return;
     }
 
     setError("");
+    setFieldErrors({});
     setBusy(true);
 
     try {
@@ -639,6 +652,7 @@ export default function CasePage() {
       setRejectModalOpen(false);
       setRejectReason("");
     } catch (err) {
+      setFieldErrors(err.fields || {});
       setError(err.message || "Failed to reject");
     } finally {
       setBusy(false);
@@ -779,7 +793,11 @@ export default function CasePage() {
                 placeholder={field.placeholder}
                 rows={3}
                 className="case-textarea"
+                aria-invalid={Boolean(fieldErrors[field.key])}
               />
+              {fieldErrors[field.key] && (
+                <span className="case-field-error">{fieldErrors[field.key]}</span>
+              )}
             </label>
           ))}
 
@@ -1066,20 +1084,32 @@ export default function CasePage() {
               <span className="case-label">Clause title</span>
               <input
                 value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
+                onChange={(e) => {
+                  setNewTitle(e.target.value);
+                  setFieldErrors((prev) => ({ ...prev, title: undefined }));
+                }}
                 placeholder="New clause title"
                 className="case-input"
+                aria-invalid={Boolean(fieldErrors.title)}
               />
+              {fieldErrors.title && <span className="case-field-error">{fieldErrors.title}</span>}
             </label>
 
             <label className="case-field">
               <span className="case-label">Category</span>
               <input
                 value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
+                onChange={(e) => {
+                  setNewCategory(e.target.value);
+                  setFieldErrors((prev) => ({ ...prev, category: undefined }));
+                }}
                 placeholder="Category"
                 className="case-input"
+                aria-invalid={Boolean(fieldErrors.category)}
               />
+              {fieldErrors.category && (
+                <span className="case-field-error">{fieldErrors.category}</span>
+              )}
             </label>
 
             {templateDetails && (
@@ -1147,8 +1177,26 @@ export default function CasePage() {
               </div>
             )}
 
+            <label className="case-field">
+              <span className="case-label">Clause text</span>
+              <textarea
+                value={newContent}
+                onChange={(e) => {
+                  setNewContent(e.target.value);
+                  setFieldErrors((prev) => ({ ...prev, contentCurrent: undefined }));
+                }}
+                rows={5}
+                placeholder="Write the clause text or generate it from a template..."
+                className="case-textarea"
+                aria-invalid={Boolean(fieldErrors.contentCurrent)}
+              />
+              {fieldErrors.contentCurrent && (
+                <span className="case-field-error">{fieldErrors.contentCurrent}</span>
+              )}
+            </label>
+
             <button
-              disabled={busy || !newTitle.trim()}
+              disabled={busy || !newTitle.trim() || !newContent.trim()}
               className="case-button case-button-primary case-button-full"
             >
               Add clause
@@ -1380,10 +1428,17 @@ export default function CasePage() {
 
               <textarea
                 value={draftContent}
-                onChange={(e) => setDraftContent(e.target.value)}
+                onChange={(e) => {
+                  setDraftContent(e.target.value);
+                  setFieldErrors((prev) => ({ ...prev, contentCurrent: undefined }));
+                }}
                 className="case-textarea case-editor-textarea"
                 placeholder="Write the clause text here..."
+                aria-invalid={Boolean(fieldErrors.contentCurrent)}
               />
+              {fieldErrors.contentCurrent && (
+                <span className="case-field-error">{fieldErrors.contentCurrent}</span>
+              )}
 
               <section className="case-rewrite-box" aria-labelledby="rewrite-heading">
                 <div>
@@ -1495,10 +1550,17 @@ export default function CasePage() {
                   <span className="case-label">Add comment</span>
                   <input
                     value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
+                    onChange={(e) => {
+                      setCommentText(e.target.value);
+                      setFieldErrors((prev) => ({ ...prev, message: undefined }));
+                    }}
                     placeholder="Add a comment..."
                     className="case-input"
+                    aria-invalid={Boolean(fieldErrors.message)}
                   />
+                  {fieldErrors.message && (
+                    <span className="case-field-error">{fieldErrors.message}</span>
+                  )}
                 </label>
 
                 <button
@@ -1524,11 +1586,18 @@ export default function CasePage() {
 
             <textarea
               value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
+              onChange={(e) => {
+                setRejectReason(e.target.value);
+                setFieldErrors((prev) => ({ ...prev, comment: undefined }));
+              }}
               rows={5}
               placeholder="Explain what needs to change..."
               className="case-textarea"
+              aria-invalid={Boolean(fieldErrors.comment)}
             />
+            {fieldErrors.comment && (
+              <span className="case-field-error">{fieldErrors.comment}</span>
+            )}
 
             <div className="case-modal-actions">
               <button
