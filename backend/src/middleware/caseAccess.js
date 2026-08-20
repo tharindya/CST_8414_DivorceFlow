@@ -1,4 +1,5 @@
 const Case = require("../models/Case");
+const Clause = require("../models/Clause");
 
 async function requireCaseParticipant(req, res, next) {
   try {
@@ -21,4 +22,20 @@ async function requireCaseParticipant(req, res, next) {
   }
 }
 
-module.exports = { requireCaseParticipant };
+async function requireClauseCaseParticipant(req, res, next) {
+  try {
+    const clauseId = req.params.clauseId;
+    if (!clauseId) return res.status(400).json({ error: "Missing clauseId" });
+
+    const clause = await Clause.findById(clauseId).select("caseId");
+    if (!clause) return res.status(404).json({ error: "Clause not found" });
+
+    req.params.caseId = clause.caseId.toString();
+    req.clauseCaseId = clause.caseId;
+    return requireCaseParticipant(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { requireCaseParticipant, requireClauseCaseParticipant };

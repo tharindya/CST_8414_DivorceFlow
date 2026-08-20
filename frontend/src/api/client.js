@@ -27,7 +27,11 @@ async function request(path, options = {}) {
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    throw new Error(data?.error || `Request failed: ${res.status}`);
+    const error = new Error(data?.error || `Request failed: ${res.status}`);
+    error.status = res.status;
+    error.code = data?.code || null;
+    error.fields = data?.fields || {};
+    throw error;
   }
 
   return data;
@@ -61,6 +65,8 @@ export const api = {
   // admin
   listAdminCases: () => request("/admin/cases"),
 
+  getAdminAnalytics: () => request("/admin/analytics"),
+
   getAdminCase: (caseId) => request(`/admin/cases/${caseId}`),
 
   listAdminTemplates: () => request("/admin/templates"),
@@ -93,6 +99,11 @@ export const api = {
     }),
 
   getCase: (caseId) => request(`/cases/${caseId}`),
+
+  getFinalReview: (caseId) => request(`/cases/${caseId}/final-review`),
+
+  confirmFinalReview: (caseId) =>
+    request(`/cases/${caseId}/final-review/confirm`, { method: "POST" }),
 
   updateCaseIntake: (caseId, payload) =>
     request(`/cases/${caseId}/intake`, {
@@ -130,6 +141,12 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  previewClauseRewrite: (clauseId, mode, content) =>
+    request(`/clauses/${clauseId}/rewrite`, {
+      method: "POST",
+      body: JSON.stringify({ mode, content }),
+    }),
+
   listClauseVersions: (clauseId) => request(`/clauses/${clauseId}/versions`),
 
   listCaseAudit: (caseId) => request(`/cases/${caseId}/audit`),
@@ -161,6 +178,12 @@ export const api = {
 
   // mock review
   getMockReview: (caseId) => request(`/cases/${caseId}/mock-review`),
+
+  // AI agreement review
+  getLatestAiAgreementReview: (caseId) => request(`/cases/${caseId}/ai-review`),
+
+  getAiAgreementReview: (caseId) =>
+    request(`/cases/${caseId}/ai-review`, { method: "POST" }),
 
   downloadCasePdf: async (caseId) => {
     const token = getToken();

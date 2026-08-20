@@ -5,9 +5,16 @@ const {
   buildIntakeRecommendations,
 } = require("../services/intakeRecommendations.service");
 const { recordAuditLog } = require("../services/audit.service");
+const { clearFinalConfirmations } = require("../services/signing.service");
+const {
+  validateCaseCreation,
+  validateJoinCase,
+  validateIntake,
+  sendValidationError,
+} = require("../services/validation.service");
 
 const CASE_SELECT_FIELDS =
-  "_id title status participants jurisdiction intake inviteCode inviteUsed partyBEmail invitationStatus createdAt updatedAt";
+  "_id title status participants jurisdiction intake finalConfirmations finalizedAt inviteCode inviteUsed partyBEmail invitationStatus createdAt updatedAt";
 
 const INTAKE_FIELDS = [
   "dependents",
@@ -54,13 +61,7 @@ async function createCase(req, res, next) {
   try {
     const { title, partyBEmail, jurisdiction } = req.body;
 
-    if (!title || title.trim().length < 3) {
-      return res.status(400).json({ error: "title must be at least 3 characters" });
-    }
-
-    if (!partyBEmail || !normalizeEmail(partyBEmail)) {
-      return res.status(400).json({ error: "partyBEmail is required" });
-    }
+    if (sendValidationError(res, validateCaseCreation(req.body))) return;
 
     const inviteCode = makeInviteCode();
     const inviteToken = makeInviteToken();
@@ -122,8 +123,16 @@ async function updateIntake(req, res, next) {
       return res.status(404).json({ error: "Case not found" });
     }
 
+    if (sendValidationError(res, validateIntake(req.body))) return;
+
+    const previousIntake = JSON.stringify(doc.intake?.toObject?.() || doc.intake || {});
     doc.intake = normalizeIntakePayload(req.body || {}, req.user.id);
     await doc.save();
+
+    const intakeChanged = previousIntake !== JSON.stringify(doc.intake?.toObject?.() || doc.intake || {});
+    const confirmationsReset = intakeChanged
+      ? await clearFinalConfirmations(caseId)
+      : 0;
 
     const updated = await Case.findById(caseId).select(CASE_SELECT_FIELDS);
 
@@ -137,6 +146,17 @@ async function updateIntake(req, res, next) {
         : "Guided case intake was saved but is still incomplete.",
       metadata: { completed: !!updated.intake?.completed },
     });
+
+    if (confirmationsReset) {
+      await recordAuditLog({
+        caseId,
+        userId: req.user.id,
+        type: "SIGNING_CONFIRMATIONS_RESET",
+        title: "Final confirmations reset",
+        message: "Guided intake changed, so both parties must confirm the final review again.",
+        metadata: { confirmationsReset },
+      });
+    }
 
     res.json({
       message: updated.intake?.completed
@@ -172,9 +192,7 @@ async function joinCase(req, res, next) {
     const { caseId } = req.params;
     const { inviteCode } = req.body;
 
-    if (!inviteCode) {
-      return res.status(400).json({ error: "inviteCode is required" });
-    }
+    if (sendValidationError(res, validateJoinCase(caseId, req.body))) return;
 
     const doc = await Case.findById(caseId);
 

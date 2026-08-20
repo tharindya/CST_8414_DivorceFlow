@@ -1,6 +1,7 @@
 const router = require("express").Router();
 const { requireAuth, requireAdmin } = require("../middleware/auth");
 const {
+  getAdminAnalytics,
   listAllCases,
   getAdminCaseById,
   listAdminTemplates,
@@ -10,6 +11,7 @@ const {
 
 router.use(requireAuth, requireAdmin);
 
+router.get("/analytics", getAdminAnalytics);
 router.get("/cases", listAllCases);
 router.get("/cases/:caseId", getAdminCaseById);
 

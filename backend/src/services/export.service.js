@@ -88,6 +88,42 @@ function buildAgreementPdf({ caseDoc, clauses, partyA, partyB }) {
     });
   }
 
+  ensureSpace(doc, 150);
+  doc.moveDown(0.5);
+  doc.font("Helvetica-Bold").fontSize(14).text("Final Review Confirmations");
+  doc.moveDown(0.75);
+
+  const confirmationByRole = new Map(
+    (caseDoc.finalConfirmations || []).map((confirmation) => [
+      confirmation.role,
+      confirmation,
+    ])
+  );
+  const partyAConfirmation = confirmationByRole.get("PARTY_A");
+  const partyBConfirmation = confirmationByRole.get("PARTY_B");
+
+  writeLabelValue(
+    doc,
+    "Party A workflow confirmation",
+    partyAConfirmation?.confirmedAt
+      ? `Confirmed ${new Date(partyAConfirmation.confirmedAt).toLocaleString("en-CA")}`
+      : "Not confirmed"
+  );
+  writeLabelValue(
+    doc,
+    "Party B workflow confirmation",
+    partyBConfirmation?.confirmedAt
+      ? `Confirmed ${new Date(partyBConfirmation.confirmedAt).toLocaleString("en-CA")}`
+      : "Not confirmed"
+  );
+  doc
+    .moveDown(0.5)
+    .font("Helvetica-Oblique")
+    .fontSize(9)
+    .text(
+      "These confirmations record completion of the DivorceFlow review workflow. They are not electronic signatures and do not determine legal validity."
+    );
+
   ensureSpace(doc, 180);
 
   doc.moveDown(1);

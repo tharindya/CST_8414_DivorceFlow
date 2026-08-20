@@ -6,6 +6,7 @@ import "../styles/case-page.css";
 function caseStatusClass(status) {
   switch ((status || "").toUpperCase()) {
     case "READY":
+    case "FINALIZED":
       return "case-status-ready";
     case "NEGOTIATING":
       return "case-status-negotiating";
@@ -141,6 +142,8 @@ export default function CasePage() {
   const [exportCheck, setExportCheck] = useState(null);
   const [mockReview, setMockReview] = useState(null);
   const [reviewBusy, setReviewBusy] = useState(false);
+  const [aiReview, setAiReview] = useState(null);
+  const [aiReviewBusy, setAiReviewBusy] = useState(false);
   const [intakeDraft, setIntakeDraft] = useState(EMPTY_INTAKE);
   const [intakeSaving, setIntakeSaving] = useState(false);
   const [intakeMessage, setIntakeMessage] = useState("");
@@ -162,12 +165,17 @@ export default function CasePage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState("General");
+  const [newContent, setNewContent] = useState("");
 
   const [draftContent, setDraftContent] = useState("");
+  const [rewriteMode, setRewriteMode] = useState("CLEAR");
+  const [rewritePreview, setRewritePreview] = useState(null);
+  const [rewriteBusy, setRewriteBusy] = useState(false);
   const [commentText, setCommentText] = useState("");
 
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
@@ -195,6 +203,7 @@ export default function CasePage() {
       ...prev,
       [field]: value,
     }));
+    setFieldErrors((current) => ({ ...current, [field]: "" }));
   }
 
   async function onSaveIntake(e) {
@@ -202,6 +211,7 @@ export default function CasePage() {
 
     try {
       setError("");
+      setFieldErrors({});
       setIntakeMessage("");
       setIntakeSaving(true);
 
@@ -213,6 +223,7 @@ export default function CasePage() {
       await loadIntakeRecommendations();
       await loadAuditTrail();
     } catch (err) {
+      setFieldErrors(err.fields || {});
       setError(err.message || "Failed to save guided intake");
     } finally {
       setIntakeSaving(false);
@@ -229,6 +240,20 @@ export default function CasePage() {
       setError(err.message || "Failed to run mock review");
     } finally {
       setReviewBusy(false);
+    }
+  }
+
+  async function onRunAiReview() {
+    try {
+      setError("");
+      setAiReviewBusy(true);
+      const data = await api.getAiAgreementReview(caseId);
+      setAiReview(data);
+      await loadAuditTrail();
+    } catch (err) {
+      setError(err.message || "Failed to run AI agreement review");
+    } finally {
+      setAiReviewBusy(false);
     }
   }
 
@@ -277,6 +302,7 @@ export default function CasePage() {
       const clauseRes = await api.listClauses(caseId);
       const statusRes = await api.getClauseStatus(caseId);
       const templateRes = await api.listTemplates(caseRes.case?.jurisdiction || "General");
+      const aiReviewRes = await api.getLatestAiAgreementReview(caseId);
 
       const loadedClauses = clauseRes.clauses || [];
       const loadedTemplates = templateRes.templates || [];
@@ -288,6 +314,7 @@ export default function CasePage() {
       setStatusRows(statusRes.clauses || []);
       setTemplates(loadedTemplates);
       setMockReview(null);
+      setAiReview(aiReviewRes.review || null);
       await loadExportCheck(caseRes.case);
       await loadIntakeRecommendations();
       await loadAuditTrail();
@@ -349,11 +376,11 @@ export default function CasePage() {
     if (template) {
       setNewTitle(template.title);
       setNewCategory(template.category);
-      setDraftContent("");
+      setNewContent("");
     } else {
       setNewTitle("");
       setNewCategory("General");
-      setDraftContent("");
+      setNewContent("");
     }
   }
 
@@ -372,7 +399,7 @@ export default function CasePage() {
       setBusy(true);
 
       const data = await api.buildTemplateDraft(selectedTemplateId, templateValues);
-      setDraftContent(data.content || "");
+      setNewContent(data.content || "");
       setNewTitle(data.template?.title || newTitle);
       setNewCategory(data.template?.category || newCategory);
 
@@ -430,13 +457,14 @@ export default function CasePage() {
   async function onCreateClause(e) {
     e.preventDefault();
     setError("");
+    setFieldErrors({});
     setBusy(true);
 
     try {
       const data = await api.createClause(caseId, {
         title: newTitle,
         category: newCategory,
-        contentCurrent: draftContent,
+        contentCurrent: newContent,
 
         templateId: templateDetails?.id || null,
         templateTitle: templateDetails?.title || null,
@@ -470,9 +498,10 @@ export default function CasePage() {
       setTemplateValues({});
       setNewTitle("");
       setNewCategory("General");
-      setDraftContent("");
+      setNewContent("");
       setSelectedClauseId(created._id);
     } catch (err) {
+      setFieldErrors(err.fields || {});
       setError(err.message || "Failed to create clause");
     } finally {
       setBusy(false);
@@ -483,6 +512,7 @@ export default function CasePage() {
     if (!selectedClause) return;
 
     setError("");
+    setFieldErrors({});
     setBusy(true);
 
     try {
@@ -492,6 +522,7 @@ export default function CasePage() {
 
       const updated = data.clause;
       setClauses((prev) => prev.map((c) => (c._id === updated._id ? updated : c)));
+      setRewritePreview(null);
 
       const statusRes = await api.getClauseStatus(caseId);
       const nextCase = { ...(caseDoc || {}), status: statusRes.caseStatus };
@@ -504,10 +535,31 @@ export default function CasePage() {
       await loadAuditTrail();
       await loadClauseVersions(updated._id);
     } catch (err) {
+      setFieldErrors(err.fields || {});
       setError(err.message || "Failed to save clause");
     } finally {
       setBusy(false);
     }
+  }
+
+  async function onPreviewRewrite() {
+    if (!selectedClause) return;
+    try {
+      setError("");
+      setRewriteBusy(true);
+      const data = await api.previewClauseRewrite(selectedClause._id, rewriteMode, draftContent);
+      setRewritePreview(data);
+    } catch (err) {
+      setError(err.message || "Failed to generate clause rewrite");
+    } finally {
+      setRewriteBusy(false);
+    }
+  }
+
+  function onUseRewrite() {
+    if (!rewritePreview?.rewrittenContent) return;
+    setDraftContent(rewritePreview.rewrittenContent);
+    setRewritePreview(null);
   }
 
   async function onAddComment(e) {
@@ -515,6 +567,7 @@ export default function CasePage() {
     if (!selectedClause) return;
 
     setError("");
+    setFieldErrors({});
     setBusy(true);
 
     try {
@@ -524,6 +577,7 @@ export default function CasePage() {
       await loadCommentsForClause(selectedClause._id);
       await loadAuditTrail();
     } catch (err) {
+      setFieldErrors(err.fields || {});
       setError(err.message || "Failed to add comment");
     } finally {
       setBusy(false);
@@ -572,11 +626,13 @@ export default function CasePage() {
 
     const reason = rejectReason.trim();
     if (!reason) {
+      setFieldErrors({ comment: "Rejection reason is required" });
       setError("Reason for rejection is required.");
       return;
     }
 
     setError("");
+    setFieldErrors({});
     setBusy(true);
 
     try {
@@ -596,19 +652,8 @@ export default function CasePage() {
       setRejectModalOpen(false);
       setRejectReason("");
     } catch (err) {
+      setFieldErrors(err.fields || {});
       setError(err.message || "Failed to reject");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function onDownloadPdf() {
-    try {
-      setError("");
-      setBusy(true);
-      await api.downloadCasePdf(caseId);
-    } catch (err) {
-      setError(err.message || "Failed to export PDF");
     } finally {
       setBusy(false);
     }
@@ -684,25 +729,31 @@ export default function CasePage() {
         </div>
 
         <div className="case-hero-actions">
+          <Link
+            to={`/cases/${caseId}/final-review`}
+            className="case-button case-button-secondary"
+          >
+            Open final review
+          </Link>
+
+          <button
+            type="button"
+            onClick={onRunAiReview}
+            disabled={aiReviewBusy || reviewBusy || busy || clauses.length === 0}
+            className="case-button case-button-primary"
+          >
+            {aiReviewBusy ? "Analyzing agreement..." : "Run AI agreement review"}
+          </button>
+
           <button
             type="button"
             onClick={onRunMockReview}
-            disabled={reviewBusy || busy}
+            disabled={reviewBusy || aiReviewBusy || busy}
             className="case-button case-button-secondary"
           >
             {reviewBusy ? "Running review..." : "Run mock review"}
           </button>
 
-          {caseDoc?.status === "READY" && (
-            <button
-              type="button"
-              onClick={onDownloadPdf}
-              disabled={busy}
-              className="case-button case-button-primary"
-            >
-              Download PDF
-            </button>
-          )}
         </div>
       </section>
 
@@ -742,7 +793,11 @@ export default function CasePage() {
                 placeholder={field.placeholder}
                 rows={3}
                 className="case-textarea"
+                aria-invalid={Boolean(fieldErrors[field.key])}
               />
+              {fieldErrors[field.key] && (
+                <span className="case-field-error">{fieldErrors[field.key]}</span>
+              )}
             </label>
           ))}
 
@@ -841,6 +896,74 @@ export default function CasePage() {
             )}
           </div>
         )}
+
+        <div className="case-review-card case-review-card-ai">
+          <div className="case-review-header">
+            <h2 className="case-review-title">AI agreement review</h2>
+            {aiReview?.readiness && (
+              <span className={`case-ai-readiness case-ai-readiness--${aiReview.readiness.toLowerCase()}`}>
+                {aiReview.readiness.replaceAll("_", " ")}
+              </span>
+            )}
+          </div>
+
+          {!aiReview ? (
+            <p className="case-review-copy">
+              Analyze the guided intake and all current clauses for drafting gaps,
+              conflicts, ambiguity, and incomplete details.
+            </p>
+          ) : (
+            <div className="case-review-stack">
+              <div className="case-summary-box">
+                <span className="case-review-label">AI summary</span>
+                <div>{aiReview.summary}</div>
+              </div>
+
+              <p className="case-review-copy">{aiReview.disclaimer}</p>
+
+              <div className="case-review-block">
+                <div className="case-review-label">Issues</div>
+                {aiReview.issues?.length ? (
+                  <div className="case-issue-list">
+                    {aiReview.issues.map((issue, index) => (
+                      <div key={`${issue.category}-${index}`} className="case-issue-card">
+                        <div className="case-issue-title">
+                          {issue.category}
+                          <span className="case-issue-severity">{issue.severity}</span>
+                        </div>
+                        {issue.clauseTitle && (
+                          <div className="case-ai-clause-name">Clause: {issue.clauseTitle}</div>
+                        )}
+                        <div className="case-issue-message">{issue.message}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="case-review-ok">No obvious drafting issues returned.</div>
+                )}
+              </div>
+
+              <div className="case-review-block">
+                <div className="case-review-label">Recommendations</div>
+                {aiReview.recommendations?.length ? (
+                  <div className="case-issue-list">
+                    {aiReview.recommendations.map((recommendation, index) => (
+                      <div key={`${recommendation.action}-${index}`} className="case-issue-card">
+                        <div className="case-issue-title">
+                          {recommendation.action}
+                          <span className="case-issue-severity">{recommendation.priority}</span>
+                        </div>
+                        <div className="case-issue-message">{recommendation.reason}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="case-muted">No recommendations returned.</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="case-review-card case-review-card-neutral">
           <div className="case-review-header">
@@ -961,20 +1084,32 @@ export default function CasePage() {
               <span className="case-label">Clause title</span>
               <input
                 value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
+                onChange={(e) => {
+                  setNewTitle(e.target.value);
+                  setFieldErrors((prev) => ({ ...prev, title: undefined }));
+                }}
                 placeholder="New clause title"
                 className="case-input"
+                aria-invalid={Boolean(fieldErrors.title)}
               />
+              {fieldErrors.title && <span className="case-field-error">{fieldErrors.title}</span>}
             </label>
 
             <label className="case-field">
               <span className="case-label">Category</span>
               <input
                 value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
+                onChange={(e) => {
+                  setNewCategory(e.target.value);
+                  setFieldErrors((prev) => ({ ...prev, category: undefined }));
+                }}
                 placeholder="Category"
                 className="case-input"
+                aria-invalid={Boolean(fieldErrors.category)}
               />
+              {fieldErrors.category && (
+                <span className="case-field-error">{fieldErrors.category}</span>
+              )}
             </label>
 
             {templateDetails && (
@@ -1042,8 +1177,26 @@ export default function CasePage() {
               </div>
             )}
 
+            <label className="case-field">
+              <span className="case-label">Clause text</span>
+              <textarea
+                value={newContent}
+                onChange={(e) => {
+                  setNewContent(e.target.value);
+                  setFieldErrors((prev) => ({ ...prev, contentCurrent: undefined }));
+                }}
+                rows={5}
+                placeholder="Write the clause text or generate it from a template..."
+                className="case-textarea"
+                aria-invalid={Boolean(fieldErrors.contentCurrent)}
+              />
+              {fieldErrors.contentCurrent && (
+                <span className="case-field-error">{fieldErrors.contentCurrent}</span>
+              )}
+            </label>
+
             <button
-              disabled={busy || !newTitle.trim()}
+              disabled={busy || !newTitle.trim() || !newContent.trim()}
               className="case-button case-button-primary case-button-full"
             >
               Add clause
@@ -1275,10 +1428,52 @@ export default function CasePage() {
 
               <textarea
                 value={draftContent}
-                onChange={(e) => setDraftContent(e.target.value)}
+                onChange={(e) => {
+                  setDraftContent(e.target.value);
+                  setFieldErrors((prev) => ({ ...prev, contentCurrent: undefined }));
+                }}
                 className="case-textarea case-editor-textarea"
                 placeholder="Write the clause text here..."
+                aria-invalid={Boolean(fieldErrors.contentCurrent)}
               />
+              {fieldErrors.contentCurrent && (
+                <span className="case-field-error">{fieldErrors.contentCurrent}</span>
+              )}
+
+              <section className="case-rewrite-box" aria-labelledby="rewrite-heading">
+                <div>
+                  <h3 id="rewrite-heading" className="case-section-small-title">AI clause rewrite</h3>
+                  <p className="case-panel-subtitle">
+                    Generate a drafting preview without changing the saved clause.
+                  </p>
+                </div>
+                <div className="case-rewrite-controls">
+                  <label className="case-field">
+                    <span className="case-label">Rewrite style</span>
+                    <select className="case-select" value={rewriteMode}
+                      onChange={(e) => { setRewriteMode(e.target.value); setRewritePreview(null); }}>
+                      <option value="CLEAR">Clearer language</option>
+                      <option value="CONCISE">More concise</option>
+                      <option value="FORMAL">More formal</option>
+                    </select>
+                  </label>
+                  <button type="button" className="case-button case-button-secondary"
+                    onClick={onPreviewRewrite} disabled={rewriteBusy || busy || !draftContent.trim()}>
+                    {rewriteBusy ? "Generating..." : "Generate rewrite"}
+                  </button>
+                </div>
+                {rewritePreview && (
+                  <div className="case-rewrite-preview" aria-live="polite">
+                    <div className="case-review-label">Suggested rewrite</div>
+                    <p>{rewritePreview.rewrittenContent}</p>
+                    <div className="case-help-note">{rewritePreview.disclaimer}</div>
+                    <div className="case-editor-actions">
+                      <button type="button" className="case-button case-button-primary" onClick={onUseRewrite}>Use this draft</button>
+                      <button type="button" className="case-button case-button-secondary" onClick={() => setRewritePreview(null)}>Discard</button>
+                    </div>
+                  </div>
+                )}
+              </section>
 
               <div className="case-editor-actions">
                 <button
@@ -1355,10 +1550,17 @@ export default function CasePage() {
                   <span className="case-label">Add comment</span>
                   <input
                     value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
+                    onChange={(e) => {
+                      setCommentText(e.target.value);
+                      setFieldErrors((prev) => ({ ...prev, message: undefined }));
+                    }}
                     placeholder="Add a comment..."
                     className="case-input"
+                    aria-invalid={Boolean(fieldErrors.message)}
                   />
+                  {fieldErrors.message && (
+                    <span className="case-field-error">{fieldErrors.message}</span>
+                  )}
                 </label>
 
                 <button
@@ -1384,11 +1586,18 @@ export default function CasePage() {
 
             <textarea
               value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
+              onChange={(e) => {
+                setRejectReason(e.target.value);
+                setFieldErrors((prev) => ({ ...prev, comment: undefined }));
+              }}
               rows={5}
               placeholder="Explain what needs to change..."
               className="case-textarea"
+              aria-invalid={Boolean(fieldErrors.comment)}
             />
+            {fieldErrors.comment && (
+              <span className="case-field-error">{fieldErrors.comment}</span>
+            )}
 
             <div className="case-modal-actions">
               <button

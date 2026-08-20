@@ -3,6 +3,9 @@ const ClauseAction = require("../models/ClauseAction");
 const ClauseVersion = require("../models/ClauseVersion");
 const { recomputeCaseStatus } = require("./approval.controller");
 const { recordAuditLog } = require("../services/audit.service");
+const { requestClauseRewrite } = require("../services/aiClauseRewrite.service");
+const { clearFinalConfirmations } = require("../services/signing.service");
+const { validateClause, sendValidationError } = require("../services/validation.service");
 
 async function listClauses(req, res, next) {
   try {
@@ -37,9 +40,7 @@ async function createClause(req, res, next) {
       templateDisclaimer,
     } = req.body;
 
-    if (!title || title.trim().length < 2) {
-      return res.status(400).json({ error: "title must be at least 2 characters" });
-    }
+    if (sendValidationError(res, validateClause(req.body))) return;
 
     const last = await Clause.findOne({ caseId })
       .sort({ orderIndex: -1 })
@@ -70,6 +71,9 @@ async function createClause(req, res, next) {
       updatedBy: req.user.id,
     });
 
+    const confirmationsReset = await clearFinalConfirmations(caseId);
+    await recomputeCaseStatus(caseId);
+
     await recordAuditLog({
       caseId,
       clauseId: clause._id,
@@ -84,6 +88,18 @@ async function createClause(req, res, next) {
       },
     });
 
+    if (confirmationsReset) {
+      await recordAuditLog({
+        caseId,
+        clauseId: clause._id,
+        userId: req.user.id,
+        type: "SIGNING_CONFIRMATIONS_RESET",
+        title: "Final confirmations reset",
+        message: "A clause was added, so both parties must confirm the final review again.",
+        metadata: { confirmationsReset },
+      });
+    }
+
     res.status(201).json({ clause });
   } catch (err) {
     next(err);
@@ -97,6 +113,8 @@ async function updateClause(req, res, next) {
 
     const clause = await Clause.findById(clauseId);
     if (!clause) return res.status(404).json({ error: "Clause not found" });
+
+    if (sendValidationError(res, validateClause(req.body, { partial: true }))) return;
 
     const nextTitle =
       typeof title === "string" ? title.trim() : clause.title;
@@ -150,6 +168,7 @@ async function updateClause(req, res, next) {
         approvalsReset: true,
       });
 
+      const confirmationsReset = await clearFinalConfirmations(clause.caseId);
       await ClauseAction.deleteMany({ clauseId: clause._id });
       await recomputeCaseStatus(clause.caseId);
       approvalsReset = true;
@@ -169,6 +188,18 @@ async function updateClause(req, res, next) {
           newCategory: nextCategory,
         },
       });
+
+      if (confirmationsReset) {
+        await recordAuditLog({
+          caseId: clause.caseId,
+          clauseId: clause._id,
+          userId: req.user.id,
+          type: "SIGNING_CONFIRMATIONS_RESET",
+          title: "Final confirmations reset",
+          message: "A clause changed, so both parties must confirm the final review again.",
+          metadata: { confirmationsReset },
+        });
+      }
     }
 
     res.json({ clause, approvalsReset });
@@ -177,4 +208,32 @@ async function updateClause(req, res, next) {
   }
 }
 
-module.exports = { listClauses, createClause, updateClause };
+async function previewClauseRewrite(req, res, next) {
+  try {
+    const clause = await Clause.findById(req.params.clauseId).select(
+      "_id caseId title contentCurrent"
+    );
+    if (!clause) return res.status(404).json({ error: "Clause not found" });
+
+    const mode = String(req.body.mode || "CLEAR").toUpperCase();
+    const sourceContent =
+      typeof req.body.content === "string" ? req.body.content : clause.contentCurrent;
+    const result = await requestClauseRewrite({ content: sourceContent, mode });
+
+    res.json({
+      clauseId: clause._id,
+      mode,
+      originalContent: sourceContent,
+      rewrittenContent: result.rewrittenContent,
+      changed: result.rewrittenContent !== sourceContent,
+      provider: "Gemini",
+      model: result.model,
+      disclaimer:
+        "This AI-assisted rewrite is a drafting preview. Review it before saving and do not treat it as legal advice.",
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { listClauses, createClause, updateClause, previewClauseRewrite };

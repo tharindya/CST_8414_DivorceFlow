@@ -241,3 +241,13 @@
     width: 100%;
   }
 }
+
+.auth-input[aria-invalid="true"] {
+  border-color: var(--danger-border);
+}
+
+.auth-field-error {
+  color: var(--danger-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+}

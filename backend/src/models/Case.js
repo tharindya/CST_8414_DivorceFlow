@@ -22,6 +22,15 @@ const intakeSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const finalConfirmationSchema = new mongoose.Schema(
+  {
+    role: { type: String, enum: ["PARTY_A", "PARTY_B"], required: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    confirmedAt: { type: Date, required: true },
+  },
+  { _id: false }
+);
+
 const caseSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true, minlength: 3 },
@@ -44,6 +53,9 @@ const caseSchema = new mongoose.Schema(
     participants: { type: [participantSchema], default: [] },
 
     intake: { type: intakeSchema, default: () => ({}) },
+
+    finalConfirmations: { type: [finalConfirmationSchema], default: [] },
+    finalizedAt: { type: Date, default: null },
 
     jurisdiction: {
       type: String,

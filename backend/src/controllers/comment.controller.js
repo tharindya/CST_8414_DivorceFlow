@@ -1,6 +1,7 @@
 const Comment = require("../models/Comment");
 const Clause = require("../models/Clause");
 const { recordAuditLog } = require("../services/audit.service");
+const { validateComment, sendValidationError } = require("../services/validation.service");
 
 async function listComments(req, res, next) {
   try {
@@ -22,9 +23,7 @@ async function addComment(req, res, next) {
     const { clauseId } = req.params;
     const { message } = req.body;
 
-    if (!message || !message.trim()) {
-      return res.status(400).json({ error: "message is required" });
-    }
+    if (sendValidationError(res, validateComment(req.body))) return;
 
     const clause = await Clause.findById(clauseId).select("caseId title");
     if (!clause) return res.status(404).json({ error: "Clause not found" });
