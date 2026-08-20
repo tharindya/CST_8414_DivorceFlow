@@ -156,7 +156,8 @@ export default function CasePage() {
     warnings: [],
     recommendations: [],
   });
-  const [recommendationBusy, setRecommendationBusy] = useState(false);
+  const [recommendationBusy, setRecommendationBusy] = useState("");
+  const [aiSuggestionPreview, setAiSuggestionPreview] = useState(null);
 
   const intakeStats = useMemo(() => intakeCompletionStats(intakeDraft), [intakeDraft]);
 
@@ -225,6 +226,7 @@ export default function CasePage() {
       setIntakeDraft(normalizeIntakeForForm(data.case?.intake));
       setIntakeMessage(data.message || "Guided intake saved");
       setMockReview(null);
+      setAiSuggestionPreview(null);
       await loadIntakeRecommendations();
       await loadAuditTrail();
     } catch (err) {
@@ -422,15 +424,29 @@ export default function CasePage() {
     }
   }
 
-  async function onAddRecommendedClause(recommendation) {
+  async function onGenerateRecommendedClause(recommendation) {
     try {
       setError("");
-      setRecommendationBusy(true);
+      setRecommendationBusy(recommendation.id);
+
+      const data = await api.generateAiClauseSuggestion(caseId, recommendation.id);
+      setAiSuggestionPreview(data);
+    } catch (err) {
+      setError(err.message || "Failed to generate AI clause suggestion");
+    } finally {
+      setRecommendationBusy("");
+    }
+  }
+
+  async function onAddRecommendedClause(preview) {
+    try {
+      setError("");
+      setRecommendationBusy(preview.recommendationId);
 
       const data = await api.createClause(caseId, {
-        title: recommendation.title,
-        category: recommendation.category,
-        contentCurrent: recommendation.contentCurrent,
+        title: preview.title,
+        category: preview.category,
+        contentCurrent: preview.contentCurrent,
       });
 
       const created = data.clause;
@@ -446,15 +462,16 @@ export default function CasePage() {
       setCaseDoc(nextCase);
       setSelectedClauseId(created._id);
       setMockReview(null);
+      setAiSuggestionPreview(null);
 
       await loadExportCheck(nextCase);
       await loadIntakeRecommendations();
       await loadAuditTrail();
       await loadClauseVersions(created._id);
     } catch (err) {
-      setError(err.message || "Failed to add recommended clause");
+      setError(err.message || "Failed to add AI clause draft");
     } finally {
-      setRecommendationBusy(false);
+      setRecommendationBusy("");
     }
   }
 
@@ -846,26 +863,85 @@ export default function CasePage() {
             <div className="case-recommendation-list">
               {intakeRecommendations.recommendations.map((recommendation) => (
                 <div key={recommendation.id} className="case-recommendation-card">
-                  <div>
-                    <div className="case-recommendation-title">
-                      {recommendation.title}
+                  <div className="case-recommendation-main">
+                    <div>
+                      <div className="case-recommendation-title">
+                        {recommendation.title}
+                      </div>
+                      <div className="case-recommendation-category">
+                        {recommendation.category}
+                      </div>
+                      <p className="case-recommendation-reason">
+                        {recommendation.reason}
+                      </p>
                     </div>
-                    <div className="case-recommendation-category">
-                      {recommendation.category}
-                    </div>
-                    <p className="case-recommendation-reason">
-                      {recommendation.reason}
-                    </p>
+
+                    <button
+                      type="button"
+                      disabled={
+                        Boolean(recommendationBusy) || !caseDoc?.intake?.completed
+                      }
+                      onClick={() => onGenerateRecommendedClause(recommendation)}
+                      className="case-button case-button-secondary"
+                    >
+                      {recommendationBusy === recommendation.id
+                        ? "Generating..."
+                        : !caseDoc?.intake?.completed
+                          ? "Complete intake first"
+                          : "Generate AI draft"}
+                    </button>
                   </div>
 
-                  <button
-                    type="button"
-                    disabled={recommendationBusy}
-                    onClick={() => onAddRecommendedClause(recommendation)}
-                    className="case-button case-button-secondary"
-                  >
-                    Add suggested clause
-                  </button>
+                  {aiSuggestionPreview?.recommendationId === recommendation.id && (
+                    <div className="case-ai-suggestion-preview">
+                      <div className="case-ai-suggestion-heading">
+                        <strong>Gemini drafting preview</strong>
+                        <span>{aiSuggestionPreview.model}</span>
+                      </div>
+
+                      <textarea
+                        className="case-textarea case-ai-suggestion-textarea"
+                        value={aiSuggestionPreview.contentCurrent}
+                        onChange={(event) =>
+                          setAiSuggestionPreview((current) => ({
+                            ...current,
+                            contentCurrent: event.target.value,
+                          }))
+                        }
+                        aria-label={`${recommendation.title} AI drafting preview`}
+                      />
+
+                      <p className="case-ai-suggestion-disclaimer">
+                        {aiSuggestionPreview.disclaimer}
+                      </p>
+
+                      <div className="case-ai-suggestion-actions">
+                        <button
+                          type="button"
+                          className="case-button case-button-primary"
+                          disabled={
+                            Boolean(recommendationBusy) ||
+                            aiSuggestionPreview.contentCurrent.trim().length < 10
+                          }
+                          onClick={() =>
+                            onAddRecommendedClause(aiSuggestionPreview)
+                          }
+                        >
+                          {recommendationBusy === recommendation.id
+                            ? "Adding draft..."
+                            : "Use this draft"}
+                        </button>
+                        <button
+                          type="button"
+                          className="case-button case-button-secondary"
+                          disabled={Boolean(recommendationBusy)}
+                          onClick={() => setAiSuggestionPreview(null)}
+                        >
+                          Discard
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
