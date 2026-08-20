@@ -1,10 +1,19 @@
 const Case = require("../models/Case");
 const Clause = require("../models/Clause");
 const ClauseAction = require("../models/ClauseAction");
+const Comment = require("../models/Comment");
 const AiAgreementReview = require("../models/AiAgreementReview");
 const { buildExportCheck } = require("./exportCheck.service");
 
-function buildFinalReview({ caseDoc, clauses, actions, exportCheck, latestAiReview, currentUserId = null }) {
+function buildFinalReview({
+  caseDoc,
+  clauses,
+  actions,
+  comments = [],
+  exportCheck,
+  latestAiReview,
+  currentUserId = null,
+}) {
   const participants = caseDoc?.participants || [];
   const participantRoles = new Set(participants.map((participant) => participant.role));
   const latestByClauseAndUser = new Map();
@@ -61,10 +70,25 @@ function buildFinalReview({ caseDoc, clauses, actions, exportCheck, latestAiRevi
     ? new Date(caseDoc.intake.completedAt).getTime()
     : 0;
   const latestDraftChange = Math.max(latestClauseChange, intakeChange);
+  const latestActionChange = (actions || []).reduce((latest, action) => {
+    const actionTime = action.createdAt ? new Date(action.createdAt).getTime() : 0;
+    return Math.max(latest, actionTime);
+  }, 0);
+  const latestCommentChange = (comments || []).reduce((latest, comment) => {
+    const commentTime = comment.createdAt ? new Date(comment.createdAt).getTime() : 0;
+    return Math.max(latest, commentTime);
+  }, 0);
+  const latestReviewContextChange = Math.max(
+    latestDraftChange,
+    latestActionChange,
+    latestCommentChange
+  );
   const aiReviewTime = latestAiReview?.createdAt
     ? new Date(latestAiReview.createdAt).getTime()
     : 0;
-  const aiReviewCurrent = Boolean(latestAiReview && aiReviewTime >= latestDraftChange);
+  const aiReviewCurrent = Boolean(
+    latestAiReview && aiReviewTime >= latestReviewContextChange
+  );
 
   const blockers = [];
   const warnings = [];
@@ -207,9 +231,10 @@ async function loadFinalReview(caseId, currentUserId = null) {
   const caseDoc = await Case.findById(caseId).lean();
   if (!caseDoc) return null;
 
-  const [clauses, actions, latestAiReview] = await Promise.all([
+  const [clauses, actions, comments, latestAiReview] = await Promise.all([
     Clause.find({ caseId }).sort({ orderIndex: 1, createdAt: 1 }).lean(),
     ClauseAction.find({ caseId }).sort({ createdAt: -1 }).lean(),
+    Comment.find({ caseId }).sort({ createdAt: -1 }).lean(),
     AiAgreementReview.findOne({ caseId }).sort({ createdAt: -1 }).lean(),
   ]);
 
@@ -217,6 +242,7 @@ async function loadFinalReview(caseId, currentUserId = null) {
     caseDoc,
     clauses,
     actions,
+    comments,
     latestAiReview,
     currentUserId,
     exportCheck: buildExportCheck(caseDoc, clauses),
