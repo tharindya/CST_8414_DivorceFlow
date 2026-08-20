@@ -11,6 +11,7 @@ import InvitePage from "../pages/InvitePage";
 import AdminDashboard from "../pages/AdminDashboard";
 import AdminCaseReview from "../pages/AdminCaseReview";
 import AdminTemplates from "../pages/AdminTemplates";
+import NotificationsPage from "../pages/NotificationsPage";
 
 export default function AppRoutes() {
   return (
@@ -52,6 +53,15 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <InvitePage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <NotificationsPage />
           </ProtectedRoute>
         }
       />

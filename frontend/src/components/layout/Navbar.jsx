@@ -1,14 +1,46 @@
-import React from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useCallback, useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { api } from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
 import "./navbar.css";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const displayEmail = user?.email || "";
   const initial = displayEmail ? displayEmail.charAt(0).toUpperCase() : "U";
+
+  const refreshUnreadCount = useCallback(async () => {
+    if (!user) {
+      setUnreadCount(0);
+      return;
+    }
+
+    try {
+      const data = await api.getUnreadNotificationCount();
+      setUnreadCount(data.unreadCount || 0);
+    } catch {
+      // Notification status must not interrupt navigation.
+    }
+  }, [user]);
+
+  useEffect(() => {
+    refreshUnreadCount();
+
+    const timer = window.setInterval(refreshUnreadCount, 30000);
+    function handleNotificationUpdate(event) {
+      setUnreadCount(event.detail?.unreadCount || 0);
+    }
+    window.addEventListener("notifications:updated", handleNotificationUpdate);
+
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("notifications:updated", handleNotificationUpdate);
+    };
+  }, [location.pathname, refreshUnreadCount]);
 
   function handleLogout() {
     logout();
@@ -28,6 +60,18 @@ export default function Navbar() {
               <div className="app-navbar__nav-links">
                 <Link to="/dashboard" className="app-navbar__link">
                   Dashboard
+                </Link>
+
+                <Link
+                  to="/notifications"
+                  className="app-navbar__link app-navbar__notification-link"
+                >
+                  Notifications
+                  {unreadCount > 0 && (
+                    <span className="app-navbar__notification-count">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
                 </Link>
 
                 {user.role === "ADMIN" && (

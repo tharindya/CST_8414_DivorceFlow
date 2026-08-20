@@ -62,6 +62,17 @@ export const api = {
 
   me: () => request("/auth/me"),
 
+  // notifications
+  listNotifications: () => request("/notifications"),
+
+  getUnreadNotificationCount: () => request("/notifications/unread-count"),
+
+  markNotificationRead: (notificationId) =>
+    request(`/notifications/${notificationId}/read`, { method: "PATCH" }),
+
+  markAllNotificationsRead: () =>
+    request("/notifications/read-all", { method: "PATCH" }),
+
   // admin
   listAdminCases: () => request("/admin/cases"),
 

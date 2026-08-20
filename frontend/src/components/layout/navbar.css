@@ -109,6 +109,27 @@
   color: #111827;
 }
 
+.app-navbar__notification-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.app-navbar__notification-count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .app-navbar__link--primary {
   padding: 8px 12px;
   border-radius: 10px;
