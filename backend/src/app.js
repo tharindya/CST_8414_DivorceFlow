@@ -10,6 +10,7 @@ const finalReviewRoutes = require("./routes/finalReview.routes");
 const adminRoutes = require("./routes/admin.routes");
 const { errorHandler } = require("./middleware/error");
 const messageRoutes = require("./routes/message.routes");
+const notificationRoutes = require("./routes/notification.routes");
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use("/", mockReviewRoutes);
 app.use("/", aiAgreementReviewRoutes);
 app.use("/", finalReviewRoutes);
 app.use("/", messageRoutes);
+app.use("/", notificationRoutes);
 
 app.use("/admin", adminRoutes);
 

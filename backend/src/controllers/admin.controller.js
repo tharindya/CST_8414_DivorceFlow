@@ -283,6 +283,18 @@ async function updateAdminClauseReview(req, res, next) {
 
     if (reviewChanged) {
       await recomputeCaseStatus(clause.caseId);
+      await recordAuditLog({
+        caseId: clause.caseId,
+        clauseId: clause._id,
+        userId: req.user.id,
+        type: "MODERATOR_REVIEW_UPDATED",
+        title: `Moderator review updated: ${clause.title}`,
+        message:
+          reviewStatus === "NEEDS_REVISION"
+            ? `${clause.title} requires revision after moderator review.`
+            : `${clause.title} was marked ${reviewStatus.toLowerCase().replace("_", " ")} by the moderator.`,
+        metadata: { reviewStatus },
+      });
     }
 
     if (confirmationsReset) {
