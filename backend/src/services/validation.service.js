@@ -95,6 +95,13 @@ function validateComment(payload = {}) {
   return fields;
 }
 
+function validateMessage(payload = {}) {
+  const fields = {};
+  const error = requiredText(payload.text, "Message", { max: 2000 });
+  if (error) fields.text = error;
+  return fields;
+}
+
 function validateRejection(payload = {}) {
   const fields = {};
   const error = requiredText(payload.comment, "Rejection reason", { min: 3, max: 2000 });
@@ -119,6 +126,7 @@ module.exports = {
   validateIntake,
   validateClause,
   validateComment,
+  validateMessage,
   validateRejection,
   sendValidationError,
 };

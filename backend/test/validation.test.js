@@ -8,6 +8,7 @@ const {
   validateIntake,
   validateClause,
   validateComment,
+  validateMessage,
   validateRejection,
   sendValidationError,
 } = require("../src/services/validation.service");
@@ -75,6 +76,12 @@ test("comment and rejection validation enforce useful feedback limits", () => {
   assert.ok(validateComment({ message: "x".repeat(2001) }).message);
   assert.ok(validateRejection({ comment: "no" }).comment);
   assert.deepEqual(validateRejection({ comment: "Payment date must be revised." }), {});
+});
+
+test("message validation rejects empty and oversized mobile messages", () => {
+  assert.ok(validateMessage({ text: "" }).text);
+  assert.ok(validateMessage({ text: "x".repeat(2001) }).text);
+  assert.deepEqual(validateMessage({ text: "Please review the updated clause." }), {});
 });
 
 test("sendValidationError returns a consistent API payload", () => {
