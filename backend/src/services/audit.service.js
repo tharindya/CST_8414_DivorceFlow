@@ -1,4 +1,5 @@
 const AuditLog = require("../models/AuditLog");
+const { createNotificationsForAudit } = require("./notification.service");
 
 async function recordAuditLog({
   caseId,
@@ -13,7 +14,7 @@ async function recordAuditLog({
     return null;
   }
 
-  return AuditLog.create({
+  const auditLog = await AuditLog.create({
     caseId,
     clauseId,
     userId,
@@ -22,6 +23,9 @@ async function recordAuditLog({
     message,
     metadata,
   });
+
+  await createNotificationsForAudit(auditLog);
+  return auditLog;
 }
 
 module.exports = { recordAuditLog };
