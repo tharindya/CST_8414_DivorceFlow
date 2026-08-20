@@ -10,6 +10,11 @@ function statusTone(status) {
       return "success";
     case "NEGOTIATING":
       return "warning";
+    case "REVIEW":
+    case "APPROVAL":
+      return "info";
+    case "REVISION":
+      return "danger";
     case "EXPORTED":
       return "neutral";
     case "DRAFT":

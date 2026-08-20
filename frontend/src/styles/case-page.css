@@ -149,6 +149,16 @@
   color: #92400e;
 }
 
+.case-status-review {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.case-status-revision {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 .case-status-exported {
   background: #e5e7eb;
   color: #374151;

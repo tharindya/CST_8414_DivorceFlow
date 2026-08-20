@@ -10,6 +10,11 @@ function caseStatusClass(status) {
       return "case-status-ready";
     case "NEGOTIATING":
       return "case-status-negotiating";
+    case "REVIEW":
+    case "APPROVAL":
+      return "case-status-review";
+    case "REVISION":
+      return "case-status-revision";
     case "EXPORTED":
       return "case-status-exported";
     case "DRAFT":

@@ -7,7 +7,7 @@ function statusTone(status) {
   if (["APPROVED", "REVIEWED", "CONFIRMED", "READY_FOR_SIGNING", "READY_FOR_HUMAN_REVIEW", "FINALIZED"].includes(status)) {
     return "success";
   }
-  if (["REJECTED", "NEEDS_REVISION", "NOT_READY", "NEEDS_WORK"].includes(status)) {
+  if (["REJECTED", "REVISION", "NEEDS_REVISION", "NOT_READY", "NEEDS_WORK"].includes(status)) {
     return "danger";
   }
   return "warning";

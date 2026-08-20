@@ -5,6 +5,7 @@ const Comment = require("../models/Comment");
 const { recordAuditLog } = require("../services/audit.service");
 const { clearFinalConfirmations } = require("../services/signing.service");
 const { validateRejection, sendValidationError } = require("../services/validation.service");
+const { recomputeCaseStatus } = require("../services/workflowStatus.service");
 
 async function ensureCaseIsNotFinalized(caseId) {
   const caseDoc = await Case.findById(caseId).select("status");
@@ -22,62 +23,6 @@ async function auditConfirmationReset({ caseId, clauseId, userId, confirmationsR
     message: "Clause approval activity changed, so both parties must confirm final review again.",
     metadata: { confirmationsReset },
   });
-}
-
-async function recomputeCaseStatus(caseId) {
-  const caseDoc = await Case.findById(caseId).select("participants status");
-  if (!caseDoc) return;
-  if (caseDoc.status === "FINALIZED") return;
-
-  const participantIds = caseDoc.participants.map((p) => p.userId.toString());
-
-  if (participantIds.length < 2) {
-    if (caseDoc.status !== "DRAFT") {
-      caseDoc.status = "DRAFT";
-      await caseDoc.save();
-    }
-    return;
-  }
-
-  const clauses = await Clause.find({ caseId }).select("_id");
-  if (clauses.length === 0) {
-    if (caseDoc.status !== "DRAFT") {
-      caseDoc.status = "DRAFT";
-      await caseDoc.save();
-    }
-    return;
-  }
-
-  for (const c of clauses) {
-    const latestActions = await ClauseAction.find({ clauseId: c._id })
-      .sort({ createdAt: -1 })
-      .select("userId action createdAt");
-
-    const latestByUser = new Map();
-    for (const a of latestActions) {
-      const uid = a.userId.toString();
-      if (!latestByUser.has(uid)) {
-        latestByUser.set(uid, a.action);
-      }
-    }
-
-    const allApproved = participantIds.every(
-      (uid) => latestByUser.get(uid) === "APPROVE"
-    );
-
-    if (!allApproved) {
-      if (caseDoc.status !== "NEGOTIATING") {
-        caseDoc.status = "NEGOTIATING";
-        await caseDoc.save();
-      }
-      return;
-    }
-  }
-
-  if (caseDoc.status !== "READY") {
-    caseDoc.status = "READY";
-    await caseDoc.save();
-  }
 }
 
 async function approveClause(req, res, next) {
