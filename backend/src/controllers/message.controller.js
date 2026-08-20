@@ -1,6 +1,10 @@
 const Case = require("../models/Case");
 const Message = require("../models/Message");
 const { recordAuditLog } = require("../services/audit.service");
+const {
+  validateMessage,
+  sendValidationError,
+} = require("../services/validation.service");
 
 function isParticipant(caseDoc, userId) {
   return caseDoc.participants.some(
@@ -36,9 +40,7 @@ async function sendMessage(req, res, next) {
     const { caseId } = req.params;
     const text = String(req.body.text || "").trim();
 
-    if (!text) {
-      return res.status(400).json({ error: "Message text is required" });
-    }
+    if (sendValidationError(res, validateMessage({ text }))) return;
 
     const caseDoc = await Case.findById(caseId);
     if (!caseDoc) {
