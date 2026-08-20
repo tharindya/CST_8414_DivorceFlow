@@ -11,6 +11,7 @@ const adminRoutes = require("./routes/admin.routes");
 const { errorHandler } = require("./middleware/error");
 const messageRoutes = require("./routes/message.routes");
 const notificationRoutes = require("./routes/notification.routes");
+const aiClauseSuggestionRoutes = require("./routes/aiClauseSuggestion.routes");
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.use("/", aiAgreementReviewRoutes);
 app.use("/", finalReviewRoutes);
 app.use("/", messageRoutes);
 app.use("/", notificationRoutes);
+app.use("/", aiClauseSuggestionRoutes);
 
 app.use("/admin", adminRoutes);
 
