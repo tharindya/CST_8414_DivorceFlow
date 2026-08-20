@@ -66,6 +66,22 @@ test("buildFinalReview treats current AI findings as advisory after moderator re
   assert.equal(review.warnings[0].code, "AI_REVIEW_RESULT");
 });
 
+test("buildFinalReview marks an AI review stale after a new collaboration comment", () => {
+  const fixture = completeFixture();
+  fixture.comments = [{
+    clauseId,
+    userId: partyB,
+    message: "Please clarify the payment date.",
+    createdAt: new Date("2026-08-01T13:00:00Z"),
+  }];
+
+  const review = buildFinalReview(fixture);
+
+  assert.equal(review.readyForSigning, false);
+  assert.equal(review.latestAiReview.current, false);
+  assert.ok(review.blockers.some((blocker) => blocker.code === "AI_REVIEW_STALE"));
+});
+
 test("buildFinalReview reports signing progress for the current party", () => {
   const fixture = completeFixture();
   fixture.currentUserId = partyB;
