@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import "../styles/admin-dashboard.css";
@@ -53,7 +53,7 @@ export default function AdminCaseReview() {
   const [reviewDrafts, setReviewDrafts] = useState({});
   const [savingClauseId, setSavingClauseId] = useState("");
 
-  async function loadCase() {
+  const loadCase = useCallback(async () => {
     try {
       setError("");
       setMessage("");
@@ -74,11 +74,11 @@ export default function AdminCaseReview() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [caseId]);
 
   useEffect(() => {
     loadCase();
-  }, [caseId]);
+  }, [loadCase]);
 
   const commentsByClause = useMemo(() => {
     const map = new Map();
