@@ -1,67 +1,127 @@
-# CST_8414_DivorceFlow
-Secure, collaborative platform for couples to draft, negotiate, and finalize divorce agreements clause-by-clause with approval workflows, comments, AI suggestions, and PDF export. Built with Scrum methodology in Azure DevOps for CST8414 group project.
+# DivorceFlow
 
+DivorceFlow is a web application for collaboratively drafting, reviewing, approving, and exporting a divorce agreement. Two parties work clause by clause while an administrator performs moderator review. Gemini provides optional drafting assistance and an advisory agreement review.
 
-# DivorceFlow – Collaborative Divorce Agreement Builder
+AI output is drafting assistance only. It is not legal advice and does not replace review by a qualified legal professional.
 
-**DivorceFlow** is a secure, two-party web platform that enables separating couples to collaboratively draft, negotiate, edit, and finalize divorce agreements clause-by-clause. Each user can propose changes, comment, approve, or reject individual sections until mutual agreement is reached, with final export to a downloadable legal document (PDF/Word).
+## Web features
 
-Built as part of **CST8414 – Agile Project Management** Assignment 2 at Algonquin College (Winter 2026), following Scrum practices with Azure DevOps for backlog, epics, features, user stories, tasks, story points, and sprint planning.
+- User registration and JWT authentication
+- Case creation, email invitation, and invite-code joining
+- Guided intake and intake-based clause recommendations
+- Jurisdiction-aware clause templates
+- Clause editing, comments, version history, approval, and rejection
+- Workflow states from `DRAFT` through `FINALIZED`
+- Gemini clause rewriting and full-agreement drafting review
+- Administrator analytics, template review, and clause review
+- Final review, confirmation by both parties, and PDF export
+- Audit trail and backend authorization controls
 
-## Project Goal
+Messaging belongs to the planned mobile application and is not part of the current web interface.
 
-Create a user-friendly, secure digital tool that simplifies the emotionally challenging process of negotiating divorce terms. By breaking agreements into editable clauses with real-time collaboration, version control, comments, and approval workflows, DivorceFlow reduces miscommunication, minimizes lawyer involvement for simple cases, and produces a clean, exportable final document ready for legal review.
+## Requirements
 
-## Core Features
+- Node.js 18 or newer
+- npm 9 or newer
+- MongoDB Community Server
+- Gemini API key for real AI features
+- Optional SMTP account for email invitations
 
-- **Two-Party Secure Login** — Separate authenticated accounts for each party with role-based access (Party A / Party B).
-- **Clause-by-Clause Editor** — Agreements structured into sections (e.g., asset division, child custody, spousal support) using customizable legal templates.
-- **Real-time Collaboration & Editing** — Both users can edit clauses simultaneously (or near real-time), with conflict highlighting.
-- **Approval / Rejection / Comment Workflow** — Per-clause buttons to Approve, Reject (with mandatory comment), or Request Changes.
-- **AI Legal Suggestions** (Mock) — Basic placeholder suggestions for fair wording or missing clauses (simulated via prompt or rule-based).
-- **Version History** — Track changes, view diffs, and restore previous clause versions.
-- **Final Agreement Export** — When both parties approve all clauses, generate and download PDF/Word document with signatures (digital placeholder).
-- **Private In-App Messaging** — Secure chat for discussing terms outside clauses.
+## Backend setup
 
-(Nice-to-have planned: Jurisdiction-specific templates, lawyer referral directory)
+```bash
+cd backend
+npm install
+```
 
-## Tech Stack
+Copy `backend/.env.example` to `backend/.env`, then replace the placeholder values. Never commit `backend/.env`.
 
-- **Frontend**: React.js (with TypeScript) + Next.js 14/15 (for SSR, API routes, and responsive UI)
-- **UI Library**: Tailwind CSS + shadcn/ui (for clean, accessible components)
-- **Backend**: Node.js + Express.js (RESTful API)
-- **Database**: MongoDB (via MongoDB Atlas – flexible schema for clauses, versions, comments)
-- **Authentication**: JWT-based (with refresh tokens) or NextAuth.js / Clerk (for easy secure login)
-- **Real-time Features**: Socket.io (for live editing indicators, comments, approvals)
-- **Document Generation**: pdf-lib or docx (for final PDF/Word export)
-- **State Management**: Zustand or Redux Toolkit (frontend)
-- **Deployment (future)**: Vercel (frontend) + Render / Railway (backend)
-- **Planning & CI/CD**: Azure DevOps (Boards for backlog/sprints, Repos for Git, optional Pipelines)
+Start MongoDB and the API:
 
-## Azure DevOps Setup
+```bash
+npm run dev
+```
 
-Project planning and tracking completed in Azure DevOps:
+The API runs at `http://localhost:5000`. Verify it at `http://localhost:5000/health`.
 
-- **Product Backlog**: Epics (e.g., User Authentication, Agreement Editor), Features, User Stories with acceptance criteria, story points (Fibonacci), priorities.
-- **Sprints**: 2-week iterations with sprint goals, committed sprint backlog, daily stand-ups (simulated).
-- **Boards**: Customized columns showing Work Item Type, Title, Story Points, State, Assigned To, Original Estimate.
+Run the backend test suite:
 
-##Development Team
+```bash
+npm test
+```
 
-Tharindya Anjalika — Backend Developer
-   Responsible for API endpoints, authentication, business logic, clause versioning, approval workflows, and document generation.
-Sahal Tai — Frontend Developer
-   Responsible for React/Next.js UI, clause editor component, real-time collaboration UI, approval/rejection interfaces, messaging view, and responsive design.
-Dasun Abeysooriya — Database Specialist
-   Responsible for MongoDB schema design, data modeling (clauses, versions, comments, users), indexing, queries, seeding test data, and ensuring secure & efficient data handling
+## Frontend setup
 
-## How to Run Locally
+Open another terminal:
 
-### Prerequisites
-- Node.js v18+ 
-- MongoDB (local or Atlas free tier)
-- Git
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-### Steps
-1. Clone the repo:
-   ```bash
+The web application runs at `http://localhost:5173` by default.
+
+Run frontend verification:
+
+```bash
+npm run lint
+npm run build
+```
+
+The frontend calls `http://localhost:5000` unless `VITE_API_BASE` is set in `frontend/.env`.
+
+## Administrator account
+
+Register a normal account, then update its role using MongoDB Shell:
+
+```javascript
+use divorceflow
+db.users.updateOne(
+  { email: "admin@test.com" },
+  { $set: { role: "ADMIN" } }
+)
+```
+
+Log out and sign in again so the new JWT contains the administrator role.
+
+## Manual test flow
+
+1. Register Party A and create a case.
+2. Complete the guided intake and add the recommended clauses.
+3. Register Party B and join with the case ID and invite code.
+4. Edit, comment on, approve, and reject clauses.
+5. Run Gemini clause rewriting and agreement review.
+6. Sign in as the administrator and review every clause.
+7. Approve every clause as both parties.
+8. Open final review and confirm as both parties.
+9. Download the finalized PDF from the final-review page.
+
+AI findings remain advisory. Current AI findings display a warning but do not block finalization after both parties and the moderator complete their required review.
+
+## Workflow states
+
+| Status | Meaning |
+| --- | --- |
+| `DRAFT` | A party or clause is missing |
+| `NEGOTIATING` | Both parties and clauses exist, but review has not started |
+| `REVIEW` | Party approval or rejection activity has started |
+| `REVISION` | A party rejected a clause or the moderator requested revision |
+| `APPROVAL` | Both parties approved every clause, but final readiness work remains |
+| `READY` | Intake, approvals, moderator review, completeness, and current AI review are complete |
+| `FINALIZED` | Both parties confirmed the current final review |
+| `EXPORTED` | Reserved for an exported terminal record |
+
+## Email invitations
+
+SMTP configuration is optional for local testing. Without it, Party A can manually share the case ID and invite code with Party B.
+
+For Gmail, use an app password rather than the normal account password.
+
+## Troubleshooting
+
+- API connection failure: verify MongoDB and the backend are running.
+- CORS error: ensure `CORS_ORIGIN` matches the frontend URL.
+- Gemini configuration error: verify `GEMINI_API_KEY` and `GEMINI_MODEL`, then restart the backend.
+- Invitation error: verify the SMTP variables or share the invite code manually.
+- Administrator pages blocked: verify the database role and sign in again.
