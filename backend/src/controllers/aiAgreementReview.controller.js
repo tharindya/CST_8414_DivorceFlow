@@ -3,6 +3,7 @@ const Clause = require("../models/Clause");
 const AiAgreementReview = require("../models/AiAgreementReview");
 const { recordAuditLog } = require("../services/audit.service");
 const { requestAgreementReview } = require("../services/aiAgreementReview.service");
+const { recomputeCaseStatus } = require("../services/workflowStatus.service");
 
 const DISCLAIMER =
   "This AI-generated drafting review may be incomplete or incorrect. It is not legal advice and does not replace review by a qualified legal professional.";
@@ -70,6 +71,8 @@ async function reviewAgreement(req, res, next) {
         model: result.model,
       },
     });
+
+    await recomputeCaseStatus(caseId);
 
     res.json(reviewResponse(savedReview));
   } catch (error) {

@@ -6,6 +6,7 @@ const {
 } = require("../services/intakeRecommendations.service");
 const { recordAuditLog } = require("../services/audit.service");
 const { clearFinalConfirmations } = require("../services/signing.service");
+const { recomputeCaseStatus } = require("../services/workflowStatus.service");
 const {
   validateCaseCreation,
   validateJoinCase,
@@ -134,6 +135,8 @@ async function updateIntake(req, res, next) {
       ? await clearFinalConfirmations(caseId)
       : 0;
 
+    await recomputeCaseStatus(caseId);
+
     const updated = await Case.findById(caseId).select(CASE_SELECT_FIELDS);
 
     await recordAuditLog({
@@ -223,6 +226,9 @@ async function joinCase(req, res, next) {
 
     await doc.save();
 
+    await recomputeCaseStatus(caseId);
+    const updated = await Case.findById(caseId).select(CASE_SELECT_FIELDS);
+
     await recordAuditLog({
       caseId,
       userId: req.user.id,
@@ -231,7 +237,7 @@ async function joinCase(req, res, next) {
       message: "The invited party joined the case using the invite code.",
     });
 
-    res.json({ case: doc });
+    res.json({ case: updated });
   } catch (err) {
     next(err);
   }

@@ -7,7 +7,7 @@ const { clauseTemplates } = require("../data/clauseTemplates");
 const { loadAdminAnalytics } = require("../services/adminAnalytics.service");
 const { clearFinalConfirmations } = require("../services/signing.service");
 const { recordAuditLog } = require("../services/audit.service");
-const { recomputeCaseStatus } = require("./approval.controller");
+const { recomputeCaseStatus } = require("../services/workflowStatus.service");
 
 async function getAdminAnalytics(req, res, next) {
   try {
@@ -283,9 +283,6 @@ async function updateAdminClauseReview(req, res, next) {
 
     if (reviewChanged) {
       await recomputeCaseStatus(clause.caseId);
-      if (reviewStatus === "NEEDS_REVISION") {
-        await Case.updateOne({ _id: clause.caseId }, { $set: { status: "REVISION" } });
-      }
     }
 
     if (confirmationsReset) {
