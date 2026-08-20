@@ -1,5 +1,13 @@
-import { useEffect, useState } from "react";
-import { View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { api } from "../../lib/api";
 import { getToken } from "../../lib/auth";
@@ -59,14 +67,12 @@ export default function CaseDetailScreen() {
   const [caseDoc, setCaseDoc] = useState<any>(null);
   const [clauses, setClauses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    loadCase();
-  }, [caseId]);
-
-  async function loadCase() {
+  const loadCase = useCallback(async ({ refresh = false } = {}) => {
     try {
+      if (!refresh) setLoading(true);
       setError("");
 
       const token = await getToken();
@@ -84,8 +90,18 @@ export default function CaseDetailScreen() {
       console.log("CASE DETAIL LOAD ERROR:", err);
       setError(err.message || "Failed to load agreement");
     } finally {
-      setLoading(false);
+      if (!refresh) setLoading(false);
     }
+  }, [caseId]);
+
+  useEffect(() => {
+    void loadCase();
+  }, [loadCase]);
+
+  async function refreshCase() {
+    setRefreshing(true);
+    await loadCase({ refresh: true });
+    setRefreshing(false);
   }
 
   if (loading) {
@@ -119,6 +135,9 @@ export default function CaseDetailScreen() {
         data={clauses}
         keyExtractor={(item) => item._id}
         contentContainerStyle={{ gap: 12, paddingBottom: 16 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={refreshCase} />
+        }
         ListEmptyComponent={
           <View style={styles.card}>
             <Text style={styles.meta}>No clauses found for this agreement.</Text>
