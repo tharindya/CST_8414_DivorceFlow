@@ -1,5 +1,8 @@
 const Case = require("../models/Case");
 const Clause = require("../models/Clause");
+const ClauseAction = require("../models/ClauseAction");
+const Comment = require("../models/Comment");
+const ClauseVersion = require("../models/ClauseVersion");
 const AiAgreementReview = require("../models/AiAgreementReview");
 const { recordAuditLog } = require("../services/audit.service");
 const { requestAgreementReview } = require("../services/aiAgreementReview.service");
@@ -41,11 +44,23 @@ async function reviewAgreement(req, res, next) {
     const caseDoc = await Case.findById(caseId).lean();
     if (!caseDoc) return res.status(404).json({ error: "Case not found" });
 
-    const clauses = await Clause.find({ caseId })
-      .sort({ orderIndex: 1, createdAt: 1 })
-      .lean();
+    const [clauses, actions, comments, versions] = await Promise.all([
+      Clause.find({ caseId }).sort({ orderIndex: 1, createdAt: 1 }).lean(),
+      ClauseAction.find({ caseId }).sort({ createdAt: -1 }).limit(500).lean(),
+      Comment.find({ caseId }).sort({ createdAt: -1 }).limit(500).lean(),
+      ClauseVersion.find({ caseId })
+        .sort({ versionNumber: -1, createdAt: -1 })
+        .limit(250)
+        .lean(),
+    ]);
 
-    const result = await requestAgreementReview({ caseDoc, clauses });
+    const result = await requestAgreementReview({
+      caseDoc,
+      clauses,
+      actions,
+      comments,
+      versions,
+    });
 
     const savedReview = await AiAgreementReview.create({
       caseId,
@@ -69,6 +84,9 @@ async function reviewAgreement(req, res, next) {
         issueCount: result.issues.length,
         provider: "Gemini",
         model: result.model,
+        actionCount: actions.length,
+        commentCount: comments.length,
+        versionCount: versions.length,
       },
     });
 
