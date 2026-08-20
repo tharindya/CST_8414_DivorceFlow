@@ -1,18 +1,33 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { api } from "../lib/api";
 import { saveSession } from "../lib/auth";
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState("a@test.com");
-  const [password, setPassword] = useState("password123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function handleLogin() {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !password) {
+      Alert.alert("Missing information", "Enter your email and password.");
+      return;
+    }
+
     try {
       setBusy(true);
-      const data = await api.login(email, password);
+      const data = await api.login(normalizedEmail, password);
       await saveSession(data.token, data.user);
       router.replace("/");
     } catch (err: any) {
@@ -23,7 +38,10 @@ export default function LoginScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
       <View style={styles.card}>
         <Text style={styles.eyebrow}>DivorceFlow Mobile</Text>
         <Text style={styles.title}>Sign in</Text>
@@ -35,6 +53,10 @@ export default function LoginScreen() {
           onChangeText={setEmail}
           placeholder="Email"
           autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="email"
+          keyboardType="email-address"
+          editable={!busy}
         />
 
         <TextInput
@@ -43,13 +65,20 @@ export default function LoginScreen() {
           onChangeText={setPassword}
           placeholder="Password"
           secureTextEntry
+          autoComplete="current-password"
+          editable={!busy}
+          onSubmitEditing={handleLogin}
         />
 
-        <Pressable style={styles.button} onPress={handleLogin} disabled={busy}>
+        <Pressable
+          style={[styles.button, busy && styles.buttonDisabled]}
+          onPress={handleLogin}
+          disabled={busy}
+        >
           <Text style={styles.buttonText}>{busy ? "Signing in..." : "Sign in"}</Text>
         </Pressable>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -80,5 +109,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: "center",
   },
+  buttonDisabled: { opacity: 0.65 },
   buttonText: { color: "#fff", fontWeight: "700" },
 });

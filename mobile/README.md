@@ -1,4 +1,26 @@
-# Welcome to your Expo app 👋
+# DivorceFlow Mobile
+
+Expo mobile client for viewing DivorceFlow agreements and using participant-only case messaging.
+
+## Backend connection
+
+Copy `.env.example` to `.env` and set `EXPO_PUBLIC_API_BASE_URL`.
+
+Android Emulator:
+
+```env
+EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:5000
+```
+
+Physical Android device on the same Wi-Fi network:
+
+```env
+EXPO_PUBLIC_API_BASE_URL=http://YOUR_COMPUTER_LAN_IP:5000
+```
+
+The backend must be running, and Windows Firewall must allow local access to port `5000` when a physical device is used.
+
+## Run locally
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 

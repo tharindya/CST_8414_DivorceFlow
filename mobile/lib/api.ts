@@ -1,9 +1,32 @@
-const API_BASE = "http://10.0.2.2:5000";
+const DEFAULT_API_BASE = "http://10.0.2.2:5000";
+const API_BASE = (
+  process.env.EXPO_PUBLIC_API_BASE_URL?.trim() || DEFAULT_API_BASE
+).replace(/\/+$/, "");
+
 type RequestOptions = RequestInit & {
   token?: string | null;
 };
 
-export async function apiRequest(path: string, options: RequestOptions = {}) {
+export class ApiError extends Error {
+  status: number;
+  fields: Record<string, string>;
+
+  constructor(
+    message: string,
+    status: number,
+    fields: Record<string, string> = {}
+  ) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.fields = fields;
+  }
+}
+
+export async function apiRequest<T = any>(
+  path: string,
+  options: RequestOptions = {}
+): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
@@ -28,13 +51,14 @@ export async function apiRequest(path: string, options: RequestOptions = {}) {
   }
 
   if (!res.ok) {
-    console.log("API ERROR PATH:", path);
-    console.log("API ERROR STATUS:", res.status);
-    console.log("API ERROR BODY:", data);
-    throw new Error(data.error || data.raw || `Request failed: ${res.status}`);
+    throw new ApiError(
+      data.error || data.raw || `Request failed: ${res.status}`,
+      res.status,
+      data.fields || {}
+    );
   }
 
-  return data;
+  return data as T;
 }
 
 export const api = {
@@ -57,7 +81,7 @@ export const api = {
     apiRequest(`/cases/${caseId}/clauses`, { token }),
 
   getClauseStatus: (caseId: string, token: string) =>
-    apiRequest(`/cases/${caseId}/status`, { token }),
+    apiRequest(`/cases/${caseId}/clauses/status`, { token }),
 
   listMessages: (caseId: string, token: string) =>
     apiRequest(`/cases/${caseId}/messages`, { token }),
