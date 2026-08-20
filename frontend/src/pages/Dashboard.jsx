@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import "../styles/dashboard.css";
@@ -54,7 +54,7 @@ export default function Dashboard() {
   const [joining, setJoining] = useState(false);
   const [joinFieldErrors, setJoinFieldErrors] = useState({});
 
-  async function loadCases() {
+  const loadCases = useCallback(async () => {
     setError("");
     try {
       setLoading(true);
@@ -65,11 +65,11 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     loadCases();
-  }, []);
+  }, [loadCases]);
 
   const stats = useMemo(() => {
     const total = cases.length;

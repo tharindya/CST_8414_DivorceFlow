@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api } from "../api/client";
 import "../styles/case-page.css";
@@ -364,7 +364,6 @@ export default function CasePage() {
       setComments([]);
       setClauseVersions([]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClauseId, selectedClause]);
 
   function statusForClause(clauseId) {
@@ -620,11 +619,11 @@ export default function CasePage() {
     setRejectModalOpen(true);
   }
 
-  function closeRejectModal() {
+  const closeRejectModal = useCallback(() => {
     if (busy) return;
     setRejectModalOpen(false);
     setRejectReason("");
-  }
+  }, [busy]);
 
   async function onRejectConfirm() {
     if (!selectedClause) return;
@@ -673,7 +672,7 @@ export default function CasePage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [rejectModalOpen, busy]);
+  }, [rejectModalOpen, busy, closeRejectModal]);
 
   if (loading) {
     return (

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import "../styles/admin-dashboard.css";
@@ -24,7 +24,7 @@ export default function AdminTemplates() {
   const [drafts, setDrafts] = useState({});
   const [savingId, setSavingId] = useState("");
 
-  async function loadTemplates() {
+  const loadTemplates = useCallback(async () => {
     try {
       setError("");
       setMessage("");
@@ -47,11 +47,11 @@ export default function AdminTemplates() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     loadTemplates();
-  }, []);
+  }, [loadTemplates]);
 
   function updateDraft(templateId, key, value) {
     setDrafts((prev) => ({

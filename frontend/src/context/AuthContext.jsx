@@ -18,7 +18,7 @@ export function AuthProvider({ children }) {
     try {
       const data = await api.me();
       setUser(data.user);
-    } catch (e) {
+    } catch {
       // token invalid/expired
       clearToken();
       setTokenState(null);
@@ -30,7 +30,6 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     loadMe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function login(email, password) {
