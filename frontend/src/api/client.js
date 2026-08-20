@@ -125,6 +125,12 @@ export const api = {
   getIntakeRecommendations: (caseId) =>
     request(`/cases/${caseId}/intake/recommendations`),
 
+  generateAiClauseSuggestion: (caseId, recommendationId) =>
+    request(
+      `/cases/${caseId}/intake/recommendations/${encodeURIComponent(recommendationId)}/ai-draft`,
+      { method: "POST" }
+    ),
+
   // templates
   listTemplates: (jurisdiction) =>
     request(
