@@ -74,6 +74,21 @@ export const api = {
   listCases: (token: string) =>
     apiRequest("/cases", { token }),
 
+  listNotifications: (token: string) =>
+    apiRequest("/notifications", { token }),
+
+  getUnreadNotificationCount: (token: string) =>
+    apiRequest("/notifications/unread-count", { token }),
+
+  markNotificationRead: (notificationId: string, token: string) =>
+    apiRequest(`/notifications/${notificationId}/read`, {
+      method: "PATCH",
+      token,
+    }),
+
+  markAllNotificationsRead: (token: string) =>
+    apiRequest("/notifications/read-all", { method: "PATCH", token }),
+
   getCase: (caseId: string, token: string) =>
     apiRequest(`/cases/${caseId}`, { token }),
 
